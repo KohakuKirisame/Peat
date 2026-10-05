@@ -9,6 +9,7 @@ from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, UploadFile
@@ -162,6 +163,9 @@ def create_app(config: Config | None = None):
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
+        allowed_hosts = {urlparse(origin).hostname for origin in config.origins}
+        if request.url.hostname not in allowed_hosts:
+            return JSONResponse({"detail": "unrecognized_host"}, 400)
         if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
             origin = request.headers.get("origin")
             same_origin = str(request.base_url).rstrip("/")

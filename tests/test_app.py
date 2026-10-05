@@ -12,7 +12,7 @@ def app(tmp_path):
 
 @pytest.fixture
 def client(app):
-    with TestClient(app, headers={"X-Peat-Request": "1"}) as client:
+    with TestClient(app, base_url="http://localhost", headers={"X-Peat-Request": "1"}) as client:
         yield client
 
 
@@ -109,7 +109,7 @@ def test_html_security_headers_and_no_trading_routes(client, app):
 
 def test_registration_can_be_closed(tmp_path):
     app = create_app(Config(data_dir=tmp_path, registration_open=False, background=False))
-    with TestClient(app, headers={"X-Peat-Request": "1"}) as client:
+    with TestClient(app, base_url="http://localhost", headers={"X-Peat-Request": "1"}) as client:
         assert register(client).status_code == 200
         assert register(client, "second").status_code == 403
 
@@ -118,10 +118,20 @@ def test_changing_ai_host_does_not_reuse_previous_key(tmp_path):
     app = create_app(
         Config(data_dir=tmp_path, background=False, llm_allowed_hosts={"one.local", "two.local"})
     )
-    with TestClient(app, headers={"X-Peat-Request": "1"}) as client:
+    with TestClient(app, base_url="http://localhost", headers={"X-Peat-Request": "1"}) as client:
         user = register(client).json()
         client.put(
             "/api/connections/openai", json={"base_url": "http://one.local/v1", "api_key": "fixture-only"}
         )
         client.put("/api/connections/openai", json={"base_url": "http://two.local/v1"})
         assert app.state.vault.get(user["id"], "openai")["api_key"] == ""
+
+
+def test_untrusted_host_cannot_reach_bootstrap_or_console(client):
+    response = client.post(
+        "/api/auth/register",
+        headers={"Host": "rebound.example", "Origin": "http://rebound.example"},
+        json={"username": "untrusted", "password": "fixture-password-123"},
+    )
+    assert response.status_code == 400
+    assert client.get("/api/auth/setup").json()["setup_required"]
