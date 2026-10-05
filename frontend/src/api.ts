@@ -82,6 +82,15 @@ export const put = <T = any>(path: string, body: unknown) =>
 export const del = (path: string) => api(path, { method: "DELETE" });
 
 const errors: Record<string, [string, string]> = {
+  question_required: ["Enter a follow-up question.", "请输入追问内容。"],
+  analysis_not_found: [
+    "This research brief is unavailable.",
+    "此研究简报暂不可用。",
+  ],
+  followup_request_conflict: [
+    "This request has already been used. Submit a new question.",
+    "此请求已提交，请重新发送问题。",
+  ],
   analysis_interrupted: [
     "The server restarted during generation. Start a new brief.",
     "服务重启导致生成中断，请重新生成。",

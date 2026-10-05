@@ -12,6 +12,7 @@ import { Button } from "./ui";
 
 export type AnalysisJob = {
   id: string;
+  kind?: "analysis" | "followup";
   status: string;
   phase: string;
   model: string;
@@ -33,9 +34,11 @@ const Tasks = createContext<{
   starting: boolean;
   stopping: boolean;
   hidden: boolean;
-  start: () => Promise<void>;
+  start: (path?: string, body?: unknown) => Promise<AnalysisJob>;
   cancel: () => Promise<void>;
   dismiss: () => void;
+  viewReport: () => void;
+  viewRequest: { analysisId: number; serial: number } | null;
 }>({} as never);
 export const useAnalysisTask = () => useContext(Tasks);
 
@@ -47,6 +50,10 @@ export function AnalysisTasks({ children }: { children: ReactNode }) {
   const [dismissed, setDismissed] = useState(
     sessionStorage.getItem(`peat-hidden-job-${user.id}`),
   );
+  const [viewRequest, setViewRequest] = useState<{
+    analysisId: number;
+    serial: number;
+  } | null>(null);
   const revision = useRef(0),
     latest = useRef<AnalysisJob | null>(null),
     alive = useRef(true),
@@ -62,7 +69,9 @@ export function AnalysisTasks({ children }: { children: ReactNode }) {
       next?.status === "completed"
     )
       display.current.notify(
-        display.current.t("Research brief is ready", "研究简报已生成"),
+        next.kind === "followup"
+          ? display.current.t("Reply is ready", "追问回复已生成")
+          : display.current.t("Research brief is ready", "研究简报已生成"),
       );
     latest.current = next;
     setJob(next);
@@ -108,16 +117,17 @@ export function AnalysisTasks({ children }: { children: ReactNode }) {
       document.removeEventListener("visibilitychange", visible);
     };
   }, [user.id]);
-  async function start() {
+  async function start(path = "/ai/analyze", body?: unknown) {
     setStarting(true);
     revision.current++;
     try {
-      const next = await post<AnalysisJob>("/ai/analyze");
+      const next = await post<AnalysisJob>(path, body);
       if (alive.current) {
         accept(next);
         setDismissed(null);
         wake.current();
       }
+      return next;
     } finally {
       if (alive.current) setStarting(false);
     }
@@ -155,6 +165,14 @@ export function AnalysisTasks({ children }: { children: ReactNode }) {
         start,
         cancel,
         dismiss,
+        viewRequest,
+        viewReport: () => {
+          if (job?.analysis_id)
+            setViewRequest((previous) => ({
+              analysisId: job.analysis_id!,
+              serial: (previous?.serial || 0) + 1,
+            }));
+        },
       }}
     >
       {children}
@@ -194,6 +212,7 @@ export function AnalysisTaskBanner({
     preparing: t("Preparing research", "准备研究数据"),
     fetching_news: t("Reading relevant news", "读取相关新闻"),
     generating: t("Generating brief", "正在生成简报"),
+    replying: t("Replying to your question", "正在回复追问"),
   };
   const title =
     job.status === "cancelling"
@@ -201,7 +220,9 @@ export function AnalysisTaskBanner({
       : task.active
         ? phases[job.phase] || t("Research running", "研究进行中")
         : job.status === "completed"
-          ? t("Research brief is ready", "研究简报已生成")
+          ? job.kind === "followup"
+            ? t("Reply is ready", "追问回复已生成")
+            : t("Research brief is ready", "研究简报已生成")
           : job.status === "cancelled"
             ? t("Generation stopped", "生成已中止")
             : job.status === "interrupted"
@@ -248,11 +269,14 @@ export function AnalysisTaskBanner({
             <Button
               secondary
               onClick={() => {
+                task.viewReport();
                 navigate("intelligence");
                 task.dismiss();
               }}
             >
-              {t("View brief", "查看简报")}
+              {job.kind === "followup"
+                ? t("View reply", "查看回复")
+                : t("View brief", "查看简报")}
               <ArrowUpRight size={14} />
             </Button>
           )

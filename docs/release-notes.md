@@ -1,24 +1,24 @@
-Peat 0.4.0 adds holding horizons and interface zoom.
+Peat 0.5.0 adds follow-up discussions for research briefs.
 
-- Choose ultra short term (intraday–3 trading days), short term (1–4 weeks), or medium/long term (1 month or longer), independently of the five risk styles.
-- Both LLM providers receive the selected horizon prompt. Each horizon template can be edited and restored; proposed actions include holding duration, review points and exit conditions.
-- Background tasks and archived briefs preserve the selected horizon and exact prompt. Earlier reports retain their original metadata.
-- Set interface zoom from 80% to 200% in the top bar or Settings → Appearance, with a 100% reset. Preferences are saved per account in the current browser, and layouts adapt to the zoom level.
-- Includes v0.3.1's international candlestick fixes and dated hover/touch tooltips for Treasury, energy and precious-metal curves.
+- Ask multi-turn questions directly under any saved brief. Each discussion uses that report's original portfolio, macro/news evidence, strategy and holding horizon.
+- OpenAI-compatible providers and Codex share the same follow-up flow. Choose a reply model and reasoning effort independently.
+- Replies run in the background without a generation timeout, with manual Stop, saved history and Markdown rendering.
+- Questions survive cancellation, failure and reloads; request retries are deduplicated. View reply opens the correct report, with user/report isolation throughout.
+- The original report remains unchanged. Long conversations retain complete recent pairs within a bounded context and expose omissions in the reply metadata/UI.
 
-Peat 0.4.0 新增持有周期与界面缩放。
+Peat 0.5.0 新增分析报告追问。
 
-- 独立选择超短线（当日–3 个交易日）、短线（1–4 周）或中长线（1 个月以上），可与五档投资风格组合使用。
-- 两种 LLM 均接入对应周期提示词。三套模板可单独编辑和恢复，操作建议包含计划持有时间、复核点和退出条件。
-- 后台任务与历史简报保存所选周期及实际提示词，旧报告保留原有元信息。
-- 顶部栏和“设置 → 外观”支持 80%–200% 界面缩放，可恢复 100%；按账户保存在当前浏览器，页面随缩放调整布局。
-- 包含 v0.3.1 的非美股 K 线修复，以及美债、能源和贵金属曲线的日期/数值悬浮与触屏提示。
+- 在已保存报告下直接进行多轮追问，沿用该报告的持仓、宏观与新闻证据、投资风格及持有周期。
+- 支持 OpenAI 兼容接口与 Codex，回复模型和思考强度可单独选择。
+- 回复后台生成、不设生成超时，支持手动中止、历史记录与 Markdown 展示。
+- 失败、中止或刷新后保留问题；重复请求自动去重。“查看回复”可返回对应报告，对话按用户与报告隔离。
+- 原报告保持原样。较长对话按上下文预算保留最近完整问答，省略更早轮次时在界面中说明。
 
-Keep the existing data volume when upgrading. Existing accounts default to medium/long term; saved custom base and style prompts are preserved. Generate a new brief to apply a holding horizon. No new API registration is needed.
+Keep the existing data volume when upgrading. The discussion table and job-kind migration are applied automatically at startup. Existing briefs can be followed up immediately; no regeneration or new API registration is required.
 
-升级时保留现有数据卷，已有账户默认使用中长线，原有通用及策略自定义提示词继续保留。重新生成简报即可应用持有周期，无需注册新 API。
+升级时保留现有数据卷，启动时自动建立对话表并迁移任务类型字段。已有报告可直接追问，无需重新生成或注册新 API。
 
-Image: `ghcr.io/kohakukirisame/peat:0.4.0` (`linux/amd64`, `linux/arm64`).
+Image: `ghcr.io/kohakukirisame/peat:0.5.0` (`linux/amd64`, `linux/arm64`).
 
 ```sh
 docker compose pull

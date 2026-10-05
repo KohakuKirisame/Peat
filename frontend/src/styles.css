@@ -3380,6 +3380,131 @@ html[data-theme="dark"] .peat-topography {
   gap: 12px;
 }
 
+.followup-history {
+  max-height: calc(65vh / var(--ui-scale));
+  overflow-y: auto;
+  padding: 0 22px;
+  scroll-behavior: smooth;
+}
+.followup-turn {
+  margin: 0 0 24px;
+  min-width: 0;
+}
+.followup-question {
+  background: var(--tint);
+  border: 1px solid var(--border);
+  border-radius: 9px 9px 2px 9px;
+  padding: 14px 16px;
+  margin-left: min(10%, 60px);
+}
+.followup-question > span,
+.followup-meta {
+  font-size: 10px;
+  color: var(--muted);
+}
+.followup-question p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+  margin: 7px 0 0;
+  font-size: 13px;
+}
+.followup-answer {
+  padding: 17px 0 0;
+  min-width: 0;
+}
+.followup-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.followup-meta strong {
+  color: var(--accent-ink);
+  font-size: 12px;
+}
+.followup-meta span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.followup-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+}
+.followup-composer {
+  padding: 18px 22px 22px;
+  border-top: 1px solid var(--border);
+}
+.followup-composer textarea {
+  min-height: 92px;
+  resize: vertical;
+  line-height: 1.7;
+}
+.followup-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+.followup-suggestions button {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 10px;
+  color: var(--subtle);
+  text-align: left;
+}
+.followup-models {
+  margin-bottom: 18px;
+}
+.followup-models summary {
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--subtle);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.followup-models summary svg {
+  vertical-align: middle;
+  margin-left: 5px;
+}
+.followup-models .model-controls {
+  padding: 15px 0 0;
+  border: 0;
+}
+.followup-actions,
+.followup-actions > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.followup-actions {
+  margin-top: 12px;
+}
+.followup-older {
+  padding: 0 22px 15px;
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .followup-history {
+    padding-inline: 15px;
+  }
+  .followup-composer {
+    padding: 15px;
+  }
+  .followup-question {
+    padding: 12px;
+    margin-left: 16px;
+  }
+}
+
 .zoom-select {
   width: 78px;
   flex-shrink: 0;

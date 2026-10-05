@@ -79,12 +79,20 @@ CREATE TABLE IF NOT EXISTS analyses (
 CREATE TABLE IF NOT EXISTS analysis_jobs (
  id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  status TEXT NOT NULL, phase TEXT NOT NULL, settings TEXT NOT NULL, error TEXT,
+ kind TEXT NOT NULL DEFAULT 'analysis',
  analysis_id INTEGER REFERENCES analyses(id) ON DELETE SET NULL,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, finished_at TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS one_active_analysis_per_user ON analysis_jobs(user_id)
  WHERE status IN ('queued','running','cancelling');
 CREATE INDEX IF NOT EXISTS analysis_jobs_user_date ON analysis_jobs(user_id,created_at DESC);
+CREATE TABLE IF NOT EXISTS analysis_followups (
+ id INTEGER PRIMARY KEY, analysis_id INTEGER NOT NULL REFERENCES analyses(id) ON DELETE CASCADE,
+ job_id TEXT NOT NULL UNIQUE REFERENCES analysis_jobs(id) ON DELETE CASCADE,
+ request_key TEXT NOT NULL, question TEXT NOT NULL, answer TEXT, context TEXT,
+ created_at TEXT NOT NULL, answered_at TEXT, UNIQUE(analysis_id,request_key)
+);
+CREATE INDEX IF NOT EXISTS followups_analysis ON analysis_followups(analysis_id,id);
 CREATE TABLE IF NOT EXISTS statement_rows (
  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  fingerprint TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(user_id,fingerprint)
@@ -103,7 +111,10 @@ class Database:
         with self.connect() as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.executescript(SCHEMA)
-            conn.execute("PRAGMA user_version=3")
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(analysis_jobs)")}
+            if "kind" not in columns:
+                conn.execute("ALTER TABLE analysis_jobs ADD COLUMN kind TEXT NOT NULL DEFAULT 'analysis'")
+            conn.execute("PRAGMA user_version=4")
 
     @contextmanager
     def connect(self):

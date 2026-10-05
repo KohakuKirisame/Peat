@@ -102,6 +102,16 @@ class Mapping(Body):
     symbol: str = Field(max_length=30, pattern=r"^[A-Za-z0-9^][A-Za-z0-9.^=\-]*$")
 
 
+class Followup(Body):
+    question: str = Field(min_length=1, max_length=8000)
+    request_id: str = Field(min_length=8, max_length=80, pattern=r"^[A-Za-z0-9_-]+$")
+    provider: Literal["openai", "codex"] | None = None
+    model: str | None = Field(default=None, max_length=120, pattern=r"^[A-Za-z0-9_./:@-]*$")
+    reasoning_effort: (
+        Literal["auto", "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"] | None
+    ) = None
+
+
 def create_app(config: Config | None = None):
     config = config or Config()
     db = Database(config.database)
@@ -563,6 +573,18 @@ def create_app(config: Config | None = None):
     @app.post("/api/ai/analyze", status_code=202)
     async def analyze(user=Depends(current_user)):
         return analysis_jobs.start(user["id"])
+
+    @app.get("/api/ai/analyses/{analysis_id}")
+    def analysis(analysis_id: int, user=Depends(current_user)):
+        return analysis_jobs.followups.report(user["id"], analysis_id)
+
+    @app.get("/api/ai/analyses/{analysis_id}/followups")
+    def followups(analysis_id: int, before: int | None = Query(None, ge=1), user=Depends(current_user)):
+        return analysis_jobs.followups.history(user["id"], analysis_id, before)
+
+    @app.post("/api/ai/analyses/{analysis_id}/followups", status_code=202)
+    async def ask_followup(analysis_id: int, body: Followup, user=Depends(current_user)):
+        return analysis_jobs.start(user["id"], body.model_dump() | {"analysis_id": analysis_id})
 
     @app.get("/api/ai/jobs/current")
     def current_analysis_job(user=Depends(current_user)):

@@ -196,6 +196,6 @@ test("regular users can use shared Codex models but cannot manage the administra
     .getByRole("button", { name: "Load model list", exact: true })
     .click();
   await expect(
-    page.locator('#model-options option[value="shared-model"]'),
+    page.locator('datalist option[value="shared-model"]'),
   ).toHaveCount(1);
 });

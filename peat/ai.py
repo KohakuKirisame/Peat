@@ -116,6 +116,115 @@ class Intelligence:
             "news_selection": selection["selection"],
         }
 
+    async def prepare(self, uid, settings):
+        provider, model, effort = settings["ai_provider"], settings["ai_model"], settings["reasoning_effort"]
+        credentials = None
+        if not model:
+            raise ProviderError("model_required")
+        if provider == "codex":
+            cached = self.db.cached(uid, "models_codex")
+            models = cached["data"] if cached else await self.models(uid, "codex")
+            chosen = next((item for item in models if item["id"] == model), None)
+            if not chosen:
+                raise ProviderError("model_unavailable")
+            if effort != "auto" and effort not in chosen["efforts"]:
+                raise ProviderError("reasoning_not_supported")
+        if provider == "openai":
+            credentials = await asyncio.to_thread(self.openai_config, uid)
+        return credentials
+
+    async def complete(self, uid, settings, system, messages, credentials=None):
+        provider, model, effort = settings["ai_provider"], settings["ai_model"], settings["reasoning_effort"]
+        if provider == "openai":
+            body = {
+                "model": model,
+                "messages": [{"role": "system", "content": system}, *messages],
+            }
+            if effort != "auto":
+                body["reasoning_effort"] = effort
+            try:
+                response = await self.request(
+                    credentials, "POST", "/chat/completions", json=body, timeout=None
+                )
+                if response.status_code in (400, 422):
+                    raise ProviderError("model_or_reasoning_rejected")
+                response.raise_for_status()
+                content = response.json()["choices"][0]["message"]["content"]
+            except (httpx.HTTPError, ValueError, KeyError, IndexError):
+                raise ProviderError("ai_request_failed") from None
+        else:
+            # Shared administrator credentials, per-user workspace, no inherited host config/MCP servers.
+            args = self.runtime.codex() + [
+                "exec",
+                "--ephemeral",
+                "--ignore-user-config",
+                "--ignore-rules",
+                "--skip-git-repo-check",
+                "--sandbox",
+                "read-only",
+                "--color",
+                "never",
+                "--json",
+                "-c",
+                'cli_auth_credentials_store="file"',
+                "-c",
+                "features.shell_tool=false",
+                "-c",
+                "features.unified_exec=false",
+                "-c",
+                "features.apply_patch_freeform=false",
+                "-c",
+                'web_search="disabled"',
+                "-m",
+                model,
+            ]
+            for feature in (
+                "apps",
+                "plugins",
+                "remote_plugin",
+                "hooks",
+                "browser_use",
+                "browser_use_external",
+                "browser_use_full_cdp_access",
+                "computer_use",
+                "image_generation",
+                "view_image",
+                "in_app_browser",
+                "multi_agent",
+                "multi_agent_v2",
+                "code_mode_host",
+                "goals",
+                "skill_search",
+                "workspace_dependencies",
+                "tool_suggest",
+            ):
+                args += ["-c", f"features.{feature}=false"]
+            args += ["-c", "features.skip_host_skill_discovery=true"]
+            if effort != "auto":
+                args += ["-c", f'model_reasoning_effort="{effort}"']
+            code, stdout, stderr = await self.runtime.run_cancellable(
+                uid,
+                args + ["-"],
+                system + "\n\nConversation messages (in order):\n" + json.dumps(messages, ensure_ascii=False),
+            )
+            if code:
+                raise ProviderError("codex_analysis_failed")
+            texts = []
+            for line in stdout.splitlines():
+                try:
+                    event = json.loads(line)
+                    if (
+                        event.get("type") == "item.completed"
+                        and event.get("item", {}).get("type") == "agent_message"
+                    ):
+                        texts.append(event["item"]["text"])
+                except (ValueError, KeyError):
+                    pass
+            content = "\n\n".join(texts)
+        if not isinstance(content, str) or not content.strip():
+            raise ProviderError("ai_empty_response")
+        return content[:60000]
+
     async def analyze(self, uid, *, settings=None, progress=None):
         lock = self.locks.setdefault(uid, asyncio.Lock())
         if lock.locked():
@@ -127,18 +236,7 @@ class Intelligence:
                 settings["ai_model"],
                 settings["reasoning_effort"],
             )
-            if not model:
-                raise ProviderError("model_required")
-            if provider == "codex":
-                cached = self.db.cached(uid, "models_codex")
-                models = cached["data"] if cached else await self.models(uid, "codex")
-                chosen = next((item for item in models if item["id"] == model), None)
-                if not chosen:
-                    raise ProviderError("model_unavailable")
-                if effort != "auto" and effort not in chosen["efforts"]:
-                    raise ProviderError("reasoning_not_supported")
-            if provider == "openai":
-                credentials = await asyncio.to_thread(self.openai_config, uid)
+            credentials = await self.prepare(uid, settings)
             selection = select_news(self.db, uid)
             if self.news:
                 if progress:
@@ -167,92 +265,9 @@ class Intelligence:
             payload = json.dumps(evidence, ensure_ascii=False)
             if progress:
                 progress("generating")
-            if provider == "openai":
-                body = {
-                    "model": model,
-                    "messages": [{"role": "system", "content": system}, {"role": "user", "content": payload}],
-                }
-                if effort != "auto":
-                    body["reasoning_effort"] = effort
-                try:
-                    response = await self.request(
-                        credentials, "POST", "/chat/completions", json=body, timeout=None
-                    )
-                    if response.status_code in (400, 422):
-                        raise ProviderError("model_or_reasoning_rejected")
-                    response.raise_for_status()
-                    content = response.json()["choices"][0]["message"]["content"]
-                except (httpx.HTTPError, ValueError, KeyError, IndexError):
-                    raise ProviderError("ai_request_failed") from None
-            else:
-                # Shared administrator credentials, per-user workspace, no inherited host config/MCP servers.
-                args = self.runtime.codex() + [
-                    "exec",
-                    "--ephemeral",
-                    "--ignore-user-config",
-                    "--ignore-rules",
-                    "--skip-git-repo-check",
-                    "--sandbox",
-                    "read-only",
-                    "--color",
-                    "never",
-                    "--json",
-                    "-c",
-                    'cli_auth_credentials_store="file"',
-                    "-c",
-                    "features.shell_tool=false",
-                    "-c",
-                    "features.unified_exec=false",
-                    "-c",
-                    "features.apply_patch_freeform=false",
-                    "-c",
-                    'web_search="disabled"',
-                    "-m",
-                    model,
-                ]
-                for feature in (
-                    "apps",
-                    "plugins",
-                    "remote_plugin",
-                    "hooks",
-                    "browser_use",
-                    "browser_use_external",
-                    "browser_use_full_cdp_access",
-                    "computer_use",
-                    "image_generation",
-                    "view_image",
-                    "in_app_browser",
-                    "multi_agent",
-                    "multi_agent_v2",
-                    "code_mode_host",
-                    "goals",
-                    "skill_search",
-                    "workspace_dependencies",
-                    "tool_suggest",
-                ):
-                    args += ["-c", f"features.{feature}=false"]
-                args += ["-c", "features.skip_host_skill_discovery=true"]
-                if effort != "auto":
-                    args += ["-c", f'model_reasoning_effort="{effort}"']
-                code, stdout, stderr = await self.runtime.run_cancellable(
-                    uid, args + ["-"], system + "\n\n" + payload
-                )
-                if code:
-                    raise ProviderError("codex_analysis_failed")
-                texts = []
-                for line in stdout.splitlines():
-                    try:
-                        event = json.loads(line)
-                        if (
-                            event.get("type") == "item.completed"
-                            and event.get("item", {}).get("type") == "agent_message"
-                        ):
-                            texts.append(event["item"]["text"])
-                    except (ValueError, KeyError):
-                        pass
-                content = "\n\n".join(texts)
-            if not isinstance(content, str) or not content.strip():
-                raise ProviderError("ai_empty_response")
+            content = await self.complete(
+                uid, settings, system, [{"role": "user", "content": payload}], credentials
+            )
             evidence["reasoning_effort"] = effort
             evidence["prompts"] = used_prompts
             created = now()

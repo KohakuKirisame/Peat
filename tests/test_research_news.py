@@ -155,7 +155,7 @@ def test_article_schema_upgrade_keeps_existing_news(db):
     db.execute("PRAGMA user_version=1")
     upgraded = Database(db.path)
     assert upgraded.one("SELECT id FROM news WHERE id=?", (article,))
-    assert upgraded.one("PRAGMA user_version")["user_version"] == 3
+    assert upgraded.one("PRAGMA user_version")["user_version"] == 4
 
 
 @pytest.mark.asyncio
