@@ -181,6 +181,14 @@ const errors: Record<string, [string, string]> = {
     "No candles for this time range.",
     "所选时间范围没有 K 线数据。",
   ],
+  chart_symbol_required: [
+    "Enter the exchange's market symbol, such as AIR.PA, ASML.AS or VUSA.L.",
+    "请填写对应交易所的行情代码，例如 AIR.PA、ASML.AS 或 VUSA.L。",
+  ],
+  invalid_chart_query: [
+    "Check the market symbol and selected time range.",
+    "请检查行情代码和所选时间范围。",
+  ],
   last_admin_required: [
     "Keep at least one active administrator.",
     "至少需要保留一位启用的管理员。",
@@ -210,10 +218,16 @@ export function errorMessage(error: unknown, t: Translate) {
   const pair = errors[key];
   return pair ? t(...pair) : t("Operation failed: ", "操作失败：") + key;
 }
-export function useResource<T = any>(path: string | null, interval = 0) {
+export function useResource<T = any>(
+  path: string | null,
+  interval = 0,
+  keepPreviousData = true,
+) {
   const [data, setData] = useState<T | null>(null),
     [error, setError] = useState<unknown>(null),
     [loading, setLoading] = useState(true);
+  const [dataPath, setDataPath] = useState<string | null>(null),
+    [errorPath, setErrorPath] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const reload = useCallback(() => setRevision((r) => r + 1), []);
   useEffect(() => {
@@ -229,11 +243,15 @@ export function useResource<T = any>(path: string | null, interval = 0) {
         .then((d) => {
           if (alive) {
             setData(d);
+            setDataPath(path);
             setError(null);
           }
         })
         .catch((e) => {
-          if (alive && e.name !== "AbortError") setError(e);
+          if (alive && e.name !== "AbortError") {
+            setError(e);
+            setErrorPath(path);
+          }
         })
         .finally(() => {
           if (alive) setLoading(false);
@@ -246,7 +264,15 @@ export function useResource<T = any>(path: string | null, interval = 0) {
       if (timer) window.clearInterval(timer);
     };
   }, [path, revision, interval]);
-  return { data, error, loading, reload, setData };
+  return {
+    data: keepPreviousData || dataPath === path ? data : null,
+    error: keepPreviousData || errorPath === path ? error : null,
+    loading:
+      loading ||
+      (!keepPreviousData && !!path && dataPath !== path && errorPath !== path),
+    reload,
+    setData,
+  };
 }
 export function useAction() {
   const { t, notify } = useApp();

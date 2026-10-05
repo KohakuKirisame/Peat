@@ -97,6 +97,7 @@ class Markets:
                     "value": value,
                     "change_pct": (value / previous - 1) * 100 if value is not None and previous else None,
                     "as_of": datetime.fromtimestamp(meta["regularMarketTime"], timezone.utc).isoformat(),
+                    "timezone": meta.get("exchangeTimezoneName") or "UTC",
                     "series": valid[-22:],
                     "observations": [
                         {

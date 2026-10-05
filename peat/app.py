@@ -356,6 +356,7 @@ def create_app(config: Config | None = None):
             vault.set(user["id"], provider, value)
             brokers.next_attempt.pop((user["id"], "portfolio"), None)
             brokers.next_attempt.pop((user["id"], "pies"), None)
+            brokers.next_attempt.pop((user["id"], "chart_instruments"), None)
             return {"ok": True}
 
     @app.delete("/api/connections/{provider}")
@@ -380,7 +381,7 @@ def create_app(config: Config | None = None):
             views.extend(pie["positions"] for pie in cached["data"].get("pies", []))
             for position in [position for view in views for position in view]:
                 position["chart_symbol"] = mappings.get(
-                    position["ticker"], suggested_symbol(position["ticker"])
+                    position["ticker"], suggested_symbol(position["ticker"], position.get("currency"))
                 )
                 position["symbol_confirmed"] = position["ticker"] in mappings
         return {
@@ -496,7 +497,35 @@ def create_app(config: Config | None = None):
         return {**values, "exchanges": await asyncio.to_thread(exchange_status)}
 
     @app.get("/api/charts")
-    async def get_chart(symbol: str, interval: str = "1d", period: str = "3mo", user=Depends(current_user)):
+    async def get_chart(
+        symbol: str = Query(max_length=60),
+        interval: str = "1d",
+        period: str = "3mo",
+        user=Depends(current_user),
+    ):
+        if "_" in symbol:
+            broker_ticker = symbol
+            mapping = db.one(
+                "SELECT symbol FROM symbol_mappings WHERE user_id=? AND ticker=?", (user["id"], broker_ticker)
+            )
+            portfolio = db.cached(user["id"], "portfolio")
+            position = next(
+                (
+                    p
+                    for p in (portfolio or {}).get("data", {}).get("positions", [])
+                    if p["ticker"] == broker_ticker
+                ),
+                {},
+            )
+            symbol = (
+                mapping["symbol"] if mapping else suggested_symbol(broker_ticker, position.get("currency"))
+            )
+            if not symbol:
+                metadata = await brokers.chart_instrument(user["id"], broker_ticker)
+                symbol = suggested_symbol(broker_ticker, metadata=metadata)
+            if not symbol:
+                raise ProviderError("chart_symbol_required")
+        symbol = symbol.strip().upper()
         return await charts.fetch(symbol, interval, period)
 
     @app.put("/api/charts/mapping")

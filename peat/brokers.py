@@ -281,6 +281,45 @@ class BrokerService:
             raise ProviderError("broker_not_connected")
         return Trading212(credentials, self.client)
 
+    async def chart_instrument(self, uid: int, ticker: str):
+        """Resolve less common broker IDs from their actual trading venue, cached per account."""
+        async with self.locks.setdefault(uid, asyncio.Lock()):
+            cached = self.db.cached(uid, "chart_instruments")
+            if (
+                cached
+                and (
+                    datetime.now(timezone.utc) - datetime.fromisoformat(cached["updated_at"])
+                ).total_seconds()
+                < 86400
+            ):
+                return cached["data"].get(ticker)
+            key = (uid, "chart_instruments")
+            if time.monotonic() < self.next_attempt.get(key, 0):
+                return cached["data"].get(ticker) if cached else None
+            self.next_attempt[key] = time.monotonic() + 60
+            try:
+                adapter = self.adapter(uid)
+                instruments, exchanges = await asyncio.gather(
+                    adapter.get("/equity/metadata/instruments"), adapter.get("/equity/metadata/exchanges")
+                )
+                schedules = {
+                    schedule["id"]: exchange["name"]
+                    for exchange in exchanges
+                    for schedule in exchange.get("workingSchedules", [])
+                }
+                metadata = {
+                    item["ticker"]: {
+                        "shortName": item.get("shortName"),
+                        "currency": item.get("currencyCode"),
+                        "exchange": schedules.get(item.get("workingScheduleId"), ""),
+                    }
+                    for item in instruments
+                }
+                self.db.put_cache(uid, "chart_instruments", metadata)
+                return metadata.get(ticker)
+            except (ProviderError, KeyError, TypeError, AttributeError):
+                return cached["data"].get(ticker) if cached else None
+
     async def sync(self, uid: int):
         async with self.locks.setdefault(uid, asyncio.Lock()):
             cached = self.db.cached(uid, "portfolio")

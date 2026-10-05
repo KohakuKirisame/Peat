@@ -893,6 +893,7 @@ html[data-theme="dark"] .insight-foot {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .market-quote {
+  position: relative;
   padding: 16px 17px 13px;
   border-top: 1px solid var(--border);
   border-right: 1px solid var(--border);
@@ -950,6 +951,58 @@ html[data-theme="dark"] .insight-foot {
 .quote-bottom .sparkline {
   max-width: 65px;
   height: 23px;
+}
+.market-trend {
+  flex: 1;
+  min-width: 0;
+  max-width: 65px;
+  height: 23px;
+}
+.market-trend svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: pan-y;
+  border-radius: 3px;
+}
+.market-trend svg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.market-trend-tooltip {
+  position: absolute;
+  z-index: 4;
+  left: 10px;
+  right: 10px;
+  bottom: 46px;
+  padding: 9px 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  box-shadow: 0 5px 18px #0002;
+  pointer-events: none;
+  overflow-wrap: anywhere;
+}
+.market-trend-tooltip time {
+  display: block;
+  color: var(--subtle);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.market-trend-tooltip strong {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+  margin-top: 3px;
+}
+.market-trend-tooltip strong span {
+  font-weight: 400;
+  font-size: 10px;
+}
+.market-grid.expanded .market-trend {
+  max-width: 140px;
+  height: 38px;
 }
 .quote-source {
   font-size: 7px;

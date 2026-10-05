@@ -33,6 +33,10 @@ CSV parsing accepts UTF-8 English Trading 212 exports with Action, Time, Total a
 
 Yahoo OHLC data retains provider timestamps, currency, timezone and missing-bar gaps. The UI does not interpolate missing candles. Minute ranges are bounded to the provider's supported retention; daily/weekly/monthly ranges extend further. Users can confirm and persist symbol mappings per instrument. Quote cache lifetime is 5 minutes; chart cache lifetime is 60 seconds.
 
+Chart symbols support country-tagged broker IDs and legacy venue-letter IDs such as `AIRp_EQ`. For unresolved IDs, the broker metadata fallback joins `workingScheduleId` to exchange working schedules and combines the instrument's `shortName` with the listing suffix. Metadata is cached per account for 24 hours, with retries throttled to one minute. Currency alone does not select a US venue. Explicit user mappings override automatic resolution. Chart requests clear obsolete data when their key changes, and selecting another holding remounts chart state.
+
+Market pulse plots use dated `observations` directly so skipped null quotes cannot shift timestamps. Hover/touch selects the nearest plotted observation; arrow keys, Home and End provide the same inspection. Tooltips display up to four decimal places and the source unit. Treasury dates are calendar dates without timezone conversion; commodity timestamps use the provider's exchange timezone. Older cache entries with only an undated series retain a static curve until refreshed.
+
 Treasury data is fetched from the official daily yield XML feed. Time-series observations include dates. Exchange calendars account for scheduled holidays, DST and breaks. Unknown/out-of-range calendars return an explicit unknown state. Regular-session status does not imply live executable prices.
 
 ## News and AI

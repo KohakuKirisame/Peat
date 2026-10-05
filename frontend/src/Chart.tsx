@@ -51,6 +51,8 @@ export function PriceChart({
     symbol
       ? `/charts?symbol=${encodeURIComponent(symbol)}&interval=${interval}&period=${period}`
       : null,
+    0,
+    false,
   );
   const action = useAction(),
     data = request.data?.data,
@@ -63,6 +65,10 @@ export function PriceChart({
     setEnd(candles.length);
     setHover(null);
   }, [request.data]);
+  useEffect(() => {
+    if (data?.symbol && symbol.includes("_"))
+      setDraft((current) => (current === symbol ? data.symbol : current));
+  }, [data?.symbol, symbol]);
   const visible = useMemo(
     () => candles.slice(Math.max(0, end - count), end),
     [candles, end, count],
@@ -130,12 +136,14 @@ export function PriceChart({
         className="symbol-form"
         onSubmit={(e) => {
           e.preventDefault();
-          setSymbol(draft.toUpperCase());
           void action.run(async () => {
+            const normalized = draft.trim().toUpperCase();
             await put("/charts/mapping", {
               ticker,
-              symbol: draft.toUpperCase(),
+              symbol: normalized,
             });
+            setSymbol(normalized);
+            setDraft(normalized);
             notify(t("Market symbol saved", "行情代码已保存"));
           });
         }}
@@ -146,6 +154,7 @@ export function PriceChart({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           maxLength={30}
+          placeholder="AIR.PA / ASML.AS / VUSA.L"
         />
         <button
           type="submit"
@@ -154,7 +163,8 @@ export function PriceChart({
           <Check size={16} />
         </button>
         <span className="muted small">
-          {data?.name} {data?.currency && `· ${data.currency}`}{" "}
+          {data?.name} {data?.symbol && `· ${data.symbol}`}{" "}
+          {data?.currency && `· ${data.currency}`}{" "}
           {data?.timezone && `· ${data.timezone}`}
         </span>
       </form>
@@ -259,17 +269,25 @@ export function PriceChart({
                 </g>
               );
             })}
-            {[
-              0,
-              Math.floor(visible.length / 3),
-              Math.floor((visible.length * 2) / 3),
-              visible.length - 1,
-            ].map((i, n) => (
+            {Array.from(
+              new Set([
+                0,
+                Math.floor(visible.length / 3),
+                Math.floor((visible.length * 2) / 3),
+                visible.length - 1,
+              ]),
+            ).map((i) => (
               <text
-                key={n}
+                key={i}
                 x={x(i)}
                 y="345"
-                textAnchor={n === 0 ? "start" : n === 3 ? "end" : "middle"}
+                textAnchor={
+                  i === 0
+                    ? "start"
+                    : i === visible.length - 1
+                      ? "end"
+                      : "middle"
+                }
               >
                 {label(visible[i].time)}
               </text>

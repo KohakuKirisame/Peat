@@ -36,6 +36,7 @@ import {
 import { PriceChart } from "./Chart";
 import { HoldingsTable } from "./HoldingsTable";
 import { NewsArticle } from "./NewsArticle";
+import { MarketTrend } from "./MarketTrend";
 
 export function MarketsPanel({ full = false }: { full?: boolean }) {
   const { t, user } = useApp();
@@ -90,7 +91,15 @@ export function MarketsPanel({ full = false }: { full?: boolean }) {
                   <span>{q.unit === "%" ? "%" : q.unit}</span>
                 </div>
                 <div className="quote-bottom">
-                  <span className={q.change_pct >= 0 ? "positive" : "negative"}>
+                  <span
+                    className={
+                      q.change_pct == null
+                        ? "muted"
+                        : q.change_pct >= 0
+                          ? "positive"
+                          : "negative"
+                    }
+                  >
                     {q.change_pct == null
                       ? t(
                           q.kind === "yield" ? "Daily rate" : "Futures",
@@ -98,8 +107,8 @@ export function MarketsPanel({ full = false }: { full?: boolean }) {
                         )
                       : `${q.change_pct >= 0 ? "+" : ""}${num(q.change_pct)}%`}
                   </span>
-                  <Sparkline
-                    values={q.series || []}
+                  <MarketTrend
+                    quote={q}
                     color={q.change_pct < 0 ? "var(--red)" : "var(--accent)"}
                   />
                 </div>
@@ -397,6 +406,7 @@ export function Overview({
               }
             >
               <PriceChart
+                key={selected.ticker}
                 ticker={selected.ticker}
                 symbol={selected.chart_symbol}
               />
@@ -649,7 +659,11 @@ export function Watchlist() {
             </button>
           }
         >
-          <PriceChart ticker={selected.symbol} symbol={selected.symbol} />
+          <PriceChart
+            key={selected.symbol}
+            ticker={selected.symbol}
+            symbol={selected.symbol}
+          />
         </Panel>
       )}
     </>
