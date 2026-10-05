@@ -47,6 +47,7 @@ class AnalysisJobs:
             "model": settings["ai_model"],
             "reasoning_effort": settings["reasoning_effort"],
             "style": settings["style"],
+            "holding_horizon": settings.get("holding_horizon"),
         }
 
     def get(self, uid, job_id):

@@ -36,7 +36,15 @@ async def test_background_job_survives_requests_and_settings_changes(tmp_path, m
         await finish.wait()
         aid = app.state.db.execute(
             "INSERT INTO analyses(user_id,provider,model,style,content,evidence,created_at) VALUES(?,?,?,?,?,?,?)",
-            (uid, "openai", settings["ai_model"], settings["style"], "# Complete", "{}", now()),
+            (
+                uid,
+                "openai",
+                settings["ai_model"],
+                settings["style"],
+                "# Complete",
+                json.dumps({"holding_horizon": settings["holding_horizon"]}),
+                now(),
+            ),
         )
         return {"id": aid}
 
@@ -53,7 +61,10 @@ async def test_background_job_survives_requests_and_settings_changes(tmp_path, m
             assert (await client.post("/api/ai/analyze")).json()["id"] == job["id"]
             assert len(seen) == 1
             settings = (await client.get("/api/me")).json()["settings"]
-            await client.put("/api/settings", json=settings | {"ai_model": "different-model"})
+            await client.put(
+                "/api/settings",
+                json=settings | {"ai_model": "different-model", "holding_horizon": "ultra_short"},
+            )
             # Other app operations remain available during the model call.
             assert (
                 await client.post("/api/watchlist", json={"symbol": "ACME", "name": "Fixture company"})
@@ -64,12 +75,14 @@ async def test_background_job_survives_requests_and_settings_changes(tmp_path, m
                 current = (await refreshed.get("/api/ai/jobs/current")).json()
                 assert current["id"] == job["id"] and current["phase"] == "generating"
                 assert current["model"] == "fixture-max"
+                assert current["holding_horizon"] == "medium_long"
             task = app.state.analysis_jobs.tasks[job["id"]]
             finish.set()
             await task
             completed = (await client.get(f"/api/ai/jobs/{job['id']}")).json()
             assert completed["status"] == "completed" and completed["analysis_id"]
             assert (await client.get("/api/ai/analyses")).json()[0]["content"] == "# Complete"
+            assert (await client.get("/api/ai/analyses")).json()[0]["holding_horizon"] == "medium_long"
 
 
 @pytest.mark.asyncio

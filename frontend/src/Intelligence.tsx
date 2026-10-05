@@ -22,6 +22,8 @@ import {
   errorMessage,
   post,
   styles,
+  holdingHorizons,
+  horizonLabel,
   useAction,
   useApp,
   useResource,
@@ -174,6 +176,9 @@ export default function Intelligence() {
   const [settings, setSettings] = useState(user.settings),
     [promptOpen, setPromptOpen] = useState(false),
     [promptStyle, setPromptStyle] = useState(user.settings.style),
+    [promptHorizon, setPromptHorizon] = useState<Settings["holding_horizon"]>(
+      user.settings.holding_horizon || "medium_long",
+    ),
     [current, setCurrent] = useState<number | null>(null),
     [evidenceOpen, setEvidenceOpen] = useState(false);
   const action = useAction(),
@@ -215,8 +220,8 @@ export default function Intelligence() {
           <Panel
             title={t("Shape your perspective", "设定研究偏好")}
             sub={t(
-              "Investment style and model reasoning are independent settings.",
-              "投资风格与模型思考强度分别设置。",
+              "Choose investment style, holding horizon and model reasoning separately.",
+              "分别设置投资风格、持有周期与模型思考强度。",
             )}
           >
             <div
@@ -246,11 +251,48 @@ export default function Intelligence() {
                 </button>
               ))}
             </div>
+            <div className="horizon-settings">
+              <span className="horizon-label">
+                {t("Holding horizon", "持有周期")}
+              </span>
+              <div
+                className="horizon-selector"
+                role="group"
+                aria-label={t("Holding horizon", "持有周期")}
+              >
+                {holdingHorizons.map((h) => (
+                  <button
+                    key={h[0]}
+                    className={
+                      (settings.holding_horizon || "medium_long") === h[0]
+                        ? "selected"
+                        : ""
+                    }
+                    aria-label={t(h[1], h[2])}
+                    aria-pressed={
+                      (settings.holding_horizon || "medium_long") === h[0]
+                    }
+                    onClick={() =>
+                      setSettings({ ...settings, holding_horizon: h[0] })
+                    }
+                  >
+                    <strong>{t(h[1], h[2])}</strong>
+                    <small>{t(h[3], h[4])}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
             <ModelControls settings={settings} onChange={setSettings} />
             <div className="settings-actions">
               <button
                 className="text-button"
-                onClick={() => setPromptOpen(!promptOpen)}
+                onClick={() => {
+                  if (!promptOpen) {
+                    setPromptStyle(settings.style);
+                    setPromptHorizon(settings.holding_horizon || "medium_long");
+                  }
+                  setPromptOpen(!promptOpen);
+                }}
               >
                 <SlidersHorizontal size={16} />
                 {t("Edit research prompts", "编辑研究提示词")}
@@ -275,8 +317,8 @@ export default function Intelligence() {
             <Panel
               title={t("Prompt studio", "提示词编辑器")}
               sub={t(
-                "A shared foundation, with a separate template for each investment style.",
-                "通用提示词与五档策略模板，可分别调整。",
+                "Edit the foundation, five investment styles and three holding horizons independently.",
+                "通用提示词、五档投资风格和三种持有周期模板，可分别调整。",
               )}
             >
               <div className="prompt-editor">
@@ -347,6 +389,56 @@ export default function Intelligence() {
                     <RotateCcw size={14} />
                     {t("Restore this strategy", "恢复此策略默认提示词")}
                   </button>
+                </div>
+                <label>
+                  {t("Horizon template", "持有周期模板")}
+                  <select
+                    aria-label={t("Horizon template", "持有周期模板")}
+                    value={promptHorizon}
+                    onChange={(e) =>
+                      setPromptHorizon(
+                        e.target.value as Settings["holding_horizon"],
+                      )
+                    }
+                  >
+                    {holdingHorizons.map((h) => (
+                      <option key={h[0]} value={h[0]}>
+                        {t(h[1], h[2])}
+                      </option>
+                    ))}
+                  </select>
+                  <textarea
+                    aria-label={t("Holding horizon prompt", "持有周期提示词")}
+                    rows={7}
+                    maxLength={8000}
+                    value={
+                      settings.ai_horizon_prompts?.[promptHorizon] ||
+                      defaults.data?.horizons?.[promptHorizon] ||
+                      ""
+                    }
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        ai_horizon_prompts: {
+                          ...settings.ai_horizon_prompts,
+                          [promptHorizon]: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                </label>
+                <div className="settings-actions">
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      const next = { ...settings.ai_horizon_prompts };
+                      delete next[promptHorizon];
+                      setSettings({ ...settings, ai_horizon_prompts: next });
+                    }}
+                  >
+                    <RotateCcw size={14} />
+                    {t("Restore this horizon", "恢复此周期默认提示词")}
+                  </button>
                   <Button
                     busy={save.busy}
                     onClick={() =>
@@ -412,6 +504,9 @@ export default function Intelligence() {
                       ]
                     }
                   </Tag>
+                  {analysis.holding_horizon && (
+                    <Tag>{horizonLabel(analysis.holding_horizon, t)}</Tag>
+                  )}
                   <span>
                     {analysis.model} · {analysis.reasoning_effort}
                   </span>
@@ -487,6 +582,8 @@ export default function Intelligence() {
                         {analysis.evidence?.prompts?.base}
                         {"\n\n"}
                         {analysis.evidence?.prompts?.style}
+                        {"\n\n"}
+                        {analysis.evidence?.prompts?.horizon}
                       </pre>
                     </details>
                   </div>
@@ -568,6 +665,9 @@ export default function Intelligence() {
                       <small>
                         {date(a.created_at, user.settings.language)}
                       </small>
+                      {a.holding_horizon && (
+                        <small>{horizonLabel(a.holding_horizon, t)}</small>
+                      )}
                       <small>{a.model}</small>
                     </div>
                     <ArrowUpRight size={14} />

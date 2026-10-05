@@ -11,9 +11,9 @@ Evaluate:
 
 Output these sections:
 ## Investment view
-A clear portfolio-level judgment tied to the selected style.
+A clear portfolio-level judgment tied to the selected style and holding horizon. Treat risk appetite and holding duration as independent choices.
 ## Proposed actions
-A Markdown table with 3–5 prioritized rows: instrument or Pie | action | current → target weight | suggested amount or staged sizing | entry/exit trigger and horizon | reason and evidence.
+A Markdown table with 3–5 prioritized rows: instrument or Pie | action | current → target weight | suggested amount or staged sizing | entry/exit trigger, intended holding period and review deadline | reason and evidence.
 Choose explicit actions: OPEN, ADD, REDUCE, CLOSE, HOLD or WATCH. For OPEN/ADD/REDUCE/CLOSE, name the instrument, direction, target weight range, a feasible amount in account currency when the data supports it, and the condition for acting. For HOLD/WATCH, state the precise event that would change the action. Size target weights and reference amounts from the supplied securities market value; fund changes through explicit portfolio rebalancing and never assume deposit/cash funding; allow staged execution and distinguish actions proposed now from conditional plans. Use supplied prices as reference points; do not invent support/resistance, valuation metrics or share quantities that require an unknown FX rate. If a trade is not supported, give a concrete HOLD/WATCH trigger instead of manufacturing a trade.
 ## Why these actions
 Explain the few portfolio, macro and news links that drive the recommendations. Include a short base/upside/downside view with observable triggers.
@@ -33,9 +33,9 @@ BASE_ZH = """你是 Peat 投资研究分析师。综合提供的持仓、宏观�
 
 按以下结构输出：
 ## 简要判断
-明确当前组合应采取的方向，并对应用户选择的投资风格。
+明确当前组合应采取的方向，并对应用户选择的投资风格和持有周期。风险偏好与持有时间分别决定建议。
 ## 操作建议
-用 Markdown 表格列出 3–5 项优先建议：标的或 Pie｜操作｜当前→目标仓位｜参考金额或分批规模｜触发条件与期限｜理由和证据。
+用 Markdown 表格列出 3–5 项优先建议：标的或 Pie｜操作｜当前→目标仓位｜参考金额或分批规模｜进出场触发条件、计划持有时间及复核期限｜理由和证据。
 操作明确选择：开仓、增持、减持、平仓、持有、观察。开仓/增持/减持/平仓要写明标的、方向、目标仓位区间、数据支持时的账户币种参考金额，以及何时行动。持有/观察要写明什么具体事件会改变建议。目标仓位和参考金额以证券持仓市值为基础，资金调整通过明确的组合内再平衡安排，不假定使用 deposit 或现金；考虑分批，区分当前建议与等待触发的计划。使用已有价格作为参考，不编造技术支撑/阻力、估值指标或需要未知汇率才能计算的股数。没有充分交易依据时，给出明确的持有/观察触发条件，不强行凑买卖建议。
 ## 核心依据
 简要解释真正驱动上述操作的持仓、宏观和新闻因素；给出精简的基准/上行/下行情景及可观测触发点。
@@ -61,17 +61,33 @@ STYLES_ZH = {
 }
 
 
+HORIZONS_EN = {
+    "ultra_short": "Holding horizon: ultra short term, within the current session to 3 trading days. Prioritize fresh company/industry catalysts, event timing and immediate reactions in the supplied dated prices. Use yields, oil and metals as the near-term macro backdrop. Rank news by whether its catalyst can play out within this window. For each proposed OPEN/ADD/REDUCE/CLOSE, specify the activation condition, intended holding duration, review point within one trading session and a time-based exit or cancellation condition if the catalyst does not materialize. Keep position sizes consistent with the selected risk style and available liquidity evidence. Existing core holdings can remain HOLD when no short-lived opportunity warrants a change.",
+    "short": "Holding horizon: short term, 1–4 weeks. Prioritize earnings, company announcements, industry catalysts and changes in rates or commodity prices that can affect the holding within the coming weeks. Distinguish a fresh catalyst from one already reflected in the supplied evidence. Give staged entry/addition or reduction/exit conditions, intended duration, a review date within one week and an event or deadline that ends the plan. Keep sizing consistent with the selected risk style; use explicit portfolio rebalancing for funding.",
+    "medium_long": "Holding horizon: medium to long term, at least 1 month. Prioritize earnings durability, valuation, industry structure and how rates, energy and metals affect the business over the coming quarters. Use news to update the investment thesis and its milestones. Give a concrete intended duration in months, staged allocation targets, a monthly or earnings-cycle review point, and fundamental or valuation conditions for reducing or closing. Keep sizing consistent with the selected risk style; avoid changing durable positions solely because of a short-lived headline.",
+}
+
+HORIZONS_ZH = {
+    "ultra_short": "持有周期：超短线，当日到 3 个交易日。优先研究最新公司/行业催化、事件发生时间及已有带时间戳价格中的即时变化，美债、油气和贵金属作为短期宏观背景。按催化能否在此窗口内兑现排序新闻。每项开仓/增持/减持/平仓建议须写明启动条件、计划持有时间、一个交易日内的复核点，以及催化未兑现时按时间退出或取消计划的条件。规模遵循用户选择的风险风格和已有流动性证据。缺少值得调整的短期催化时，原有核心持仓可继续持有。",
+    "short": "持有周期：短线，1–4 周。优先研究未来数周内影响持仓的财报、公司公告、行业催化，以及利率和商品价格变化。结合现有证据区分新催化与已被反映的事件。写明分批开仓/增持或减持/平仓条件、计划持有时间、一周内的复核日期，以及结束计划的具体事件或截止点。仓位规模遵循所选风险风格，资金通过明确的组合内再平衡安排。",
+    "medium_long": "持有周期：中长线，1 个月以上。重点分析盈利持续性、估值、行业格局，以及利率、能源和贵金属对未来季度经营的影响；用新闻更新投资逻辑和关键里程碑。写明以月计的具体计划持有时间、分批目标仓位、按月或财报周期的复核点，以及触发减持/平仓的基本面或估值条件。仓位规模遵循所选风险风格，短暂新闻波动应结合长期逻辑判断。",
+}
+
+
 def defaults(language="en"):
     return {
         "base": BASE_ZH if language == "zh" else BASE_EN,
         "styles": STYLES_ZH if language == "zh" else STYLES_EN,
+        "horizons": HORIZONS_ZH if language == "zh" else HORIZONS_EN,
     }
 
 
 def resolve(settings):
     templates = defaults(settings["language"])
+    horizon = settings.get("holding_horizon", "medium_long")
     return {
         "base": settings.get("ai_base_prompt") or templates["base"],
         "style": settings.get("ai_style_prompts", {}).get(settings["style"])
         or templates["styles"][settings["style"]],
+        "horizon": settings.get("ai_horizon_prompts", {}).get(horizon) or templates["horizons"][horizon],
     }

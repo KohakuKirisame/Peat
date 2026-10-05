@@ -11,6 +11,7 @@ export type Settings = {
   accent: string;
   language: "en" | "zh";
   style: string;
+  holding_horizon: "ultra_short" | "short" | "medium_long";
   news_limit: number;
   news_days: number;
   news_interval: number;
@@ -21,6 +22,7 @@ export type Settings = {
   news_language: "en" | "zh";
   ai_base_prompt: string;
   ai_style_prompts: Record<string, string>;
+  ai_horizon_prompts: Record<string, string>;
 };
 export type User = {
   id: number;
@@ -35,6 +37,8 @@ export const Context = createContext<{
   t: Translate;
   saveSettings: (s: Settings) => Promise<void>;
   notify: (s: string, error?: boolean) => void;
+  uiScale: number;
+  setUiScale: (scale: number) => void;
 }>({} as never);
 export const useApp = () => useContext(Context);
 
@@ -325,3 +329,24 @@ export const styles = [
   ["aggressive", "Aggressive", "激进"],
   ["very_aggressive", "Very aggressive", "极度激进"],
 ];
+export const holdingHorizons = [
+  [
+    "ultra_short",
+    "Ultra short term",
+    "超短线",
+    "Intraday–3 trading days",
+    "当日–3 个交易日",
+  ],
+  ["short", "Short term", "短线", "1–4 weeks", "1–4 周"],
+  [
+    "medium_long",
+    "Medium / long term",
+    "中长线",
+    "1 month or longer",
+    "1 个月以上",
+  ],
+] as const;
+export function horizonLabel(value: string | null | undefined, t: Translate) {
+  const item = holdingHorizons.find((h) => h[0] === value);
+  return item ? t(item[1], item[2]) : "";
+}

@@ -34,6 +34,7 @@ import Intelligence from "./Intelligence";
 import { History, News } from "./NewsHistory";
 import Settings, { Admin, Console } from "./Settings";
 import { AnalysisTasks, AnalysisTaskBanner } from "./AnalysisTasks";
+import { useUiScale } from "./useUiScale";
 
 export default function App() {
   const settingsQueue = useRef<Promise<unknown>>(Promise.resolve());
@@ -48,6 +49,7 @@ export default function App() {
   );
   const lang = user?.settings.language || guestLang,
     t = (en: string, zh: string) => (lang === "zh" ? zh : en);
+  const { scale: uiScale, setScale: setUiScale } = useUiScale(user?.id);
   useEffect(() => {
     api<User>("/me")
       .then(setUser)
@@ -135,7 +137,9 @@ export default function App() {
   if (!user)
     return <Auth onLogin={setUser} lang={guestLang} setLang={setGuestLang} />;
   return (
-    <Context.Provider value={{ user, t, saveSettings, notify }}>
+    <Context.Provider
+      value={{ user, t, saveSettings, notify, uiScale, setUiScale }}
+    >
       <AnalysisTasks key={user.id}>
         <a href="#main-content" className="skip-link">
           {t("Skip to content", "跳至正文")}
@@ -272,6 +276,23 @@ export default function App() {
                 </strong>
               </div>
               <div className="topbar-actions">
+                <select
+                  className="zoom-select"
+                  aria-label={t("Interface zoom", "界面缩放")}
+                  title={t("Interface zoom", "界面缩放")}
+                  value={uiScale}
+                  onChange={(e) => setUiScale(Number(e.target.value))}
+                >
+                  {Array.from(
+                    new Set([80, 90, 100, 110, 125, 150, 175, 200, uiScale]),
+                  )
+                    .sort((a, b) => a - b)
+                    .map((value) => (
+                      <option key={value} value={value}>
+                        {value}%
+                      </option>
+                    ))}
+                </select>
                 <span className="today">
                   {new Date().toLocaleDateString(
                     lang === "zh" ? "zh-CN" : "en-GB",

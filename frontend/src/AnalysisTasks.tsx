@@ -7,7 +7,7 @@ import {
   Square,
   X,
 } from "lucide-react";
-import { api, errorMessage, post, useApp } from "./api";
+import { api, errorMessage, horizonLabel, post, useApp } from "./api";
 import { Button } from "./ui";
 
 export type AnalysisJob = {
@@ -18,6 +18,7 @@ export type AnalysisJob = {
   provider: string;
   reasoning_effort: string;
   style: string;
+  holding_horizon?: string | null;
   analysis_id: number | null;
   error: string | null;
   created_at: string;
@@ -222,6 +223,7 @@ export function AnalysisTaskBanner({
         <strong>{title}</strong>
         <span>
           {job.model} · {job.reasoning_effort} · {elapsed}
+          {job.holding_horizon && ` · ${horizonLabel(job.holding_horizon, t)}`}
           {task.active &&
             ` · ${t("Continues in the background", "可继续操作其他页面")}`}
           {job.status === "failed" &&

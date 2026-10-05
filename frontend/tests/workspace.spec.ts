@@ -51,7 +51,16 @@ test("registration, responsive UI, preferences, prompts, chart controls and loca
     .getByLabel("Reasoning effort", { exact: true })
     .selectOption("high");
   await page.getByRole("button", { name: "Aggressive", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Ultra short term", exact: true })
+    .click();
   await page.getByRole("button", { name: "Edit research prompts" }).click();
+  await expect(
+    page.getByLabel("Horizon template", { exact: true }),
+  ).toHaveValue("ultra_short");
+  await page
+    .getByLabel("Holding horizon prompt", { exact: true })
+    .fill("Custom horizon: review the catalyst within 3 trading days.");
   await page
     .getByLabel("Base research prompt")
     .fill(
@@ -66,7 +75,22 @@ test("registration, responsive UI, preferences, prompts, chart controls and loca
   await expect(
     page.getByLabel("Reasoning effort", { exact: true }),
   ).toHaveValue("high");
+  await expect(
+    page.getByRole("button", { name: "Ultra short term", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: "Aggressive", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Edit research prompts" }).click();
+  await expect(
+    page.getByLabel("Holding horizon prompt", { exact: true }),
+  ).toHaveValue("Custom horizon: review the catalyst within 3 trading days.");
+  await page
+    .getByRole("button", { name: "Restore this horizon", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Holding horizon prompt", { exact: true }),
+  ).toHaveValue(/current session to 3 trading days/);
   await expect(page.getByLabel("Base research prompt")).toHaveValue(
     /Custom test research/,
   );

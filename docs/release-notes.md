@@ -1,22 +1,24 @@
-Peat 0.3.1 fixes international charts and adds market-curve inspection.
+Peat 0.4.0 adds holding horizons and interface zoom.
 
-- Resolve international Trading 212 symbols, including the Airbus legacy ID `AIRp_EQ → AIR.PA`, with instrument/exchange metadata fallback and preserved user overrides.
-- Clear the previous holding's chart and company details when switching instruments or chart queries.
-- Inspect Treasury, energy and precious-metal curves with mouse hover, keyboard or touch. Each point shows its actual date/time, value and unit; commodity timestamps include the exchange timezone.
-- Preserve timestamp/value alignment across missing observations and avoid duplicate labels on short candle histories.
+- Choose ultra short term (intraday–3 trading days), short term (1–4 weeks), or medium/long term (1 month or longer), independently of the five risk styles.
+- Both LLM providers receive the selected horizon prompt. Each horizon template can be edited and restored; proposed actions include holding duration, review points and exit conditions.
+- Background tasks and archived briefs preserve the selected horizon and exact prompt. Earlier reports retain their original metadata.
+- Set interface zoom from 80% to 200% in the top bar or Settings → Appearance, with a 100% reset. Preferences are saved per account in the current browser, and layouts adapt to the zoom level.
+- Includes v0.3.1's international candlestick fixes and dated hover/touch tooltips for Treasury, energy and precious-metal curves.
 
-Peat 0.3.1 修复非美股 K 线，并增加市场曲线数值查看。
+Peat 0.4.0 新增持有周期与界面缩放。
 
-- 修复 Trading212 非美股代码转换，包含 Airbus 的 `AIRp_EQ → AIR.PA`；增加标的/交易所元数据回退，保留手动映射优先级。
-- 切换标的或行情请求时，清除上一持仓的 K 线与公司信息。
-- 美债、能源与贵金属曲线支持鼠标悬浮、键盘和触屏查看日期/时间、具体数值及单位；商品时间包含交易所时区。
-- 缺失行情不会造成时间与数值错位，少量 K 线不再重复显示日期标签。
+- 独立选择超短线（当日–3 个交易日）、短线（1–4 周）或中长线（1 个月以上），可与五档投资风格组合使用。
+- 两种 LLM 均接入对应周期提示词。三套模板可单独编辑和恢复，操作建议包含计划持有时间、复核点和退出条件。
+- 后台任务与历史简报保存所选周期及实际提示词，旧报告保留原有元信息。
+- 顶部栏和“设置 → 外观”支持 80%–200% 界面缩放，可恢复 100%；按账户保存在当前浏览器，页面随缩放调整布局。
+- 包含 v0.3.1 的非美股 K 线修复，以及美债、能源和贵金属曲线的日期/数值悬浮与触屏提示。
 
-Keep the existing data volume when upgrading. No new API registration is needed. Existing manually saved chart symbols remain in effect and can be edited in the chart.
+Keep the existing data volume when upgrading. Existing accounts default to medium/long term; saved custom base and style prompts are preserved. Generate a new brief to apply a holding horizon. No new API registration is needed.
 
-升级时保留现有数据卷，无需注册新的 API。原有手动保存的行情代码继续生效，可在图表中修改。
+升级时保留现有数据卷，已有账户默认使用中长线，原有通用及策略自定义提示词继续保留。重新生成简报即可应用持有周期，无需注册新 API。
 
-Image: `ghcr.io/kohakukirisame/peat:0.3.1` (`linux/amd64`, `linux/arm64`).
+Image: `ghcr.io/kohakukirisame/peat:0.4.0` (`linux/amd64`, `linux/arm64`).
 
 ```sh
 docker compose pull

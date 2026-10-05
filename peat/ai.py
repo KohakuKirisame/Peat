@@ -145,6 +145,7 @@ class Intelligence:
                     progress("fetching_news")
                 await self.news.enrich_for_analysis(uid, selection["items"])
             evidence = self.evidence(uid, selection)
+            evidence["holding_horizon"] = settings.get("holding_horizon", "medium_long")
             if not evidence["news"] and not evidence["portfolio"]:
                 raise ProviderError("analysis_needs_evidence")
             used_prompts = resolve(settings)
@@ -152,6 +153,8 @@ class Intelligence:
                 used_prompts["base"]
                 + "\n\n"
                 + used_prompts["style"]
+                + "\n\n"
+                + used_prompts["horizon"]
                 + "\nResponse language: "
                 + ("Simplified Chinese." if settings["language"] == "zh" else "English.")
                 + "\nCount holdings once using the account-wide positions list. The pies and ungrouped_positions "
@@ -264,6 +267,7 @@ class Intelligence:
                 "style": settings["style"],
                 "content": content[:60000],
                 "reasoning_effort": effort,
+                "holding_horizon": evidence["holding_horizon"],
                 "evidence": evidence,
                 "created_at": created,
             }

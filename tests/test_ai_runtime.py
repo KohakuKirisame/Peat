@@ -21,7 +21,11 @@ def test_five_distinct_editable_strategies():
             "style": "aggressive",
             "ai_style_prompts": {"aggressive": "MY STYLE"},
         }
-        assert resolve(custom) == {"base": "CUSTOM", "style": "MY STYLE"}
+        assert resolve(custom) == {
+            "base": "CUSTOM",
+            "style": "MY STYLE",
+            "horizon": templates["horizons"]["medium_long"],
+        }
 
 
 @pytest.mark.asyncio
@@ -34,6 +38,8 @@ async def test_ai_model_reasoning_prompt_and_provenance(tmp_path):
         "reasoning_effort": "high",
         "ai_base_prompt": "MY BASE",
         "ai_style_prompts": {"balanced": "MY STRATEGY"},
+        "holding_horizon": "ultra_short",
+        "ai_horizon_prompts": {"ultra_short": "MY HORIZON"},
     }
     db.execute(
         "INSERT INTO users(id,username,password_hash,role,created_at,settings) VALUES(1,'fixture','unused','admin','2026',?)",
@@ -59,6 +65,9 @@ async def test_ai_model_reasoning_prompt_and_provenance(tmp_path):
         )
         assert "test-only-key" not in json.dumps(result)
         assert result["evidence"]["prompts"]["base"] == "MY BASE"
+        assert "MY HORIZON" in requests[0]["messages"][0]["content"]
+        assert result["holding_horizon"] == result["evidence"]["holding_horizon"] == "ultra_short"
+        assert result["evidence"]["prompts"]["horizon"] == "MY HORIZON"
         settings["reasoning_effort"] = "auto"
         db.execute("UPDATE users SET settings=? WHERE id=1", (json.dumps(settings),))
         await service.analyze(1)

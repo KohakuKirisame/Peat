@@ -14,6 +14,7 @@ DEFAULT_SETTINGS = {
     "accent": "#8a9aff",
     "language": "en",
     "style": "balanced",
+    "holding_horizon": "medium_long",
     "news_limit": 500,
     "news_days": 30,
     "news_interval": 900,
@@ -24,6 +25,7 @@ DEFAULT_SETTINGS = {
     "news_language": "en",
     "ai_base_prompt": "",
     "ai_style_prompts": {},
+    "ai_horizon_prompts": {},
 }
 
 SCHEMA = """

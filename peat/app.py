@@ -49,6 +49,7 @@ class Settings(Body):
     style: Literal["very_conservative", "conservative", "balanced", "aggressive", "very_aggressive"] = (
         "balanced"
     )
+    holding_horizon: Literal["ultra_short", "short", "medium_long"] = "medium_long"
     news_limit: int = Field(default=500, ge=10, le=20000)
     news_days: int = Field(default=30, ge=1, le=365)
     news_interval: int = Field(default=900, ge=300, le=86400)
@@ -63,6 +64,9 @@ class Settings(Body):
     ai_style_prompts: dict[
         Literal["very_conservative", "conservative", "balanced", "aggressive", "very_aggressive"], str
     ] = Field(default_factory=dict, max_length=5)
+    ai_horizon_prompts: dict[Literal["ultra_short", "short", "medium_long"], str] = Field(
+        default_factory=dict, max_length=3
+    )
 
 
 class Credential(Body):
@@ -304,7 +308,10 @@ def create_app(config: Config | None = None):
 
     @app.put("/api/settings")
     def settings(body: Settings, user=Depends(current_user)):
-        if any(len(value) > 8000 for value in body.ai_style_prompts.values()):
+        if any(
+            len(value) > 8000
+            for value in (*body.ai_style_prompts.values(), *body.ai_horizon_prompts.values())
+        ):
             raise HTTPException(422, "prompt_too_long")
         db.execute("UPDATE users SET settings=? WHERE id=?", (body.model_dump_json(), user["id"]))
         news.prune(user["id"])
@@ -550,6 +557,7 @@ def create_app(config: Config | None = None):
         for row in rows:
             row["evidence"] = json.loads(row["evidence"])
             row["reasoning_effort"] = row["evidence"].get("reasoning_effort", "auto")
+            row["holding_horizon"] = row["evidence"].get("holding_horizon")
         return rows
 
     @app.post("/api/ai/analyze", status_code=202)

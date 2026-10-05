@@ -28,6 +28,43 @@ import {
 import type { Settings as Preferences } from "./api";
 import { Button, External, Loading, Panel, ResourceError, Tag } from "./ui";
 
+function InterfaceScale() {
+  const { t, uiScale, setUiScale } = useApp();
+  return (
+    <div className="interface-scale">
+      <label htmlFor="interface-scale">
+        {t("Interface zoom", "界面缩放")} <strong>{uiScale}%</strong>
+      </label>
+      <input
+        id="interface-scale"
+        type="range"
+        min={80}
+        max={200}
+        step={5}
+        value={uiScale}
+        onChange={(e) => setUiScale(Number(e.target.value))}
+      />
+      <div className="scale-foot">
+        <span>
+          {t(
+            "Saved for this account in this browser",
+            "为此账户保存在当前浏览器",
+          )}
+        </span>
+        <button
+          type="button"
+          className="text-button"
+          onClick={() => setUiScale(100)}
+          aria-label={t("Reset interface zoom", "恢复界面缩放")}
+        >
+          <RefreshCw size={13} />
+          100%
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function JobOutput({
   id,
   onDone,
@@ -322,8 +359,8 @@ export default function Settings() {
                 </div>
                 <p className="field-hint">
                   {t(
-                    "Select the model, reasoning effort and editable prompts in Intelligence. Local endpoints need PEAT_LLM_ALLOWED_HOSTS.",
-                    "在智能研究中选择模型、思考强度并编辑提示词。本地接口需配置 PEAT_LLM_ALLOWED_HOSTS。",
+                    "Select the model, reasoning effort, holding horizon and editable prompts in Intelligence. Local endpoints need PEAT_LLM_ALLOWED_HOSTS.",
+                    "在智能研究中选择模型、思考强度、持有周期并编辑提示词。本地接口需配置 PEAT_LLM_ALLOWED_HOSTS。",
                   )}
                 </p>
                 <div className="settings-actions">
@@ -486,6 +523,7 @@ export default function Settings() {
                   );
                 })}
               </div>
+              <InterfaceScale />
               <label>{t("Accent color", "强调色")}</label>
               <div className="accent-options">
                 {["#8a9aff", "#b19aff", "#75c9e4", "#d497c4", "#d5b082"].map(

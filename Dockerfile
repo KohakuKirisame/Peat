@@ -14,7 +14,7 @@ RUN npm install --prefix /opt/peat-runtime --registry=https://registry.npmjs.org
 RUN node /opt/peat-runtime/node_modules/@openai/codex/bin/codex.js --version
 
 FROM python:3.13-slim-bookworm
-ARG VERSION=0.3.1
+ARG VERSION=0.4.0
 LABEL org.opencontainers.image.title="Peat" \
       org.opencontainers.image.description="Self-hosted investment intelligence" \
       org.opencontainers.image.source="https://github.com/KohakuKirisame/Peat" \

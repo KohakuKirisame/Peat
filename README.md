@@ -9,6 +9,7 @@ Self-hosted investment research with Trading 212, local news and configurable AI
 ## Features
 
 - Responsive desktop/mobile workspace, English/Chinese, a night-sky default theme, light/dark/system options and a custom accent color.
+- Interface zoom from 80% to 200% in the top bar and Settings → Appearance, with a 100% reset. Saved per account in the current browser, with responsive layouts adjusted to the zoom level.
 - Username/password registration. The first account is the administrator; administrators can edit usernames, roles, activation and passwords.
 - Trading 212 Invest/Stocks ISA account value, current holding cost, cash, realized/unrealized P&L, positions, executions, dividends and cash movements. Live and demo environments are separate.
 - Pies appear as collapsed portfolio groups with securities value and P&L. Expand a Pie to inspect its holdings or open a constituent's candlestick chart. Search includes Pie names and constituent stocks.
@@ -17,6 +18,7 @@ Self-hosted investment research with Trading 212, local news and configurable AI
 - Company/industry RSS headlines, excerpts and expandable article bodies for holdings and a manual watchlist. Structured article text, readable-page and AMP fallbacks, retry controls, configurable count/age limits and manual clearing.
 - OpenAI-compatible Chat Completions and locally installed Codex CLI. Model discovery, manual API model IDs and user-selected reasoning effort. Codex effort choices come from its model catalog.
 - Five investment styles, shared and per-style editable prompts, reset-to-default controls and analysis archives containing the exact evidence, prompts, model and effort used.
+- Independent holding horizons: ultra short term (intraday–3 trading days), short term (1–4 weeks), and medium/long term (1 month or longer). Each has an editable prompt; proposed actions include holding duration, review points and exit conditions.
 - Background research tasks continue across navigation and page reloads, with progress, elapsed time and a manual Stop button. Model generation has no Peat timeout.
 - One administrator-managed Codex device login serves the whole workspace. Research workspaces remain per user. Admin-only local console and versioned Codex/calendar dependency updates.
 - Encrypted API credentials, hashed passwords, persistent Docker storage, CI checks and multi-architecture Docker releases.
@@ -80,7 +82,7 @@ For subsequent launches, activate the virtual environment and run `python -m pea
 4. **News:** Add companies and industry names to Watchlist, then Collect news. Google News RSS requires no API registration. Retention settings remove the oldest saved items.
 5. **AI API:** Save a base URL including `/v1` and a key. For local servers, explicitly list their hostnames in `PEAT_LLM_ALLOWED_HOSTS`, e.g. `localhost,127.0.0.1,host.docker.internal`. The base URL must point to a trusted endpoint.
 6. **Codex:** An administrator opens Settings → Start device login, follows the verification link and enters the one-time code. Enable device-code login in ChatGPT security settings if required. All Peat users can then use this shared connection; only administrators can connect or disconnect it. An existing active administrator's Peat login is adopted on upgrade. Host-machine credentials are never imported.
-7. **Research:** Choose provider, model, reasoning effort and style in Intelligence. Refresh model discovery after login. Edit the shared/per-style prompts, save preferences, then Generate brief. The selected provider receives securities holdings, market data and relevant news for that analysis. You can continue using other pages while it runs; the global task bar shows progress and provides Stop generation and View brief controls.
+7. **Research:** Choose provider, model, reasoning effort, investment style and holding horizon in Intelligence. Refresh model discovery after login. Edit the shared, style and horizon prompts, save preferences, then Generate brief. The selected provider receives securities holdings, market data and relevant news for that analysis. You can continue using other pages while it runs; the global task bar shows progress and provides Stop generation and View brief controls.
 
 ## Data semantics
 
@@ -97,6 +99,8 @@ News cards expand to fetch and cache the readable publisher article, including G
 Research ranks cached news by held companies, position weights, watchlist companies, industry terms and recency, then balances coverage and sources and removes repeated headlines. Up to 30 relevant stories enter a brief. Body retrieval runs for that selected set with a bounded time budget; text budgets are shared across the retrieved bodies. The evidence panel records the associated companies/industries and whether article text or an RSS excerpt was used.
 
 Each user can run one research task at a time. Settings are captured when the task starts; selected holdings and news stay attached to that run. Browser navigation, reloads and disconnects do not stop it. OpenAI-compatible generation and Codex inference have no application time limit; Stop cancels the request or Codex process tree without saving a partial brief. Article acquisition and model discovery keep separate network limits. A server restart marks unfinished tasks as interrupted; generate a new brief to resume research.
+
+Holding horizon is independent of risk style. The default is medium/long term; the three default timing windows can be adjusted in Prompt studio. Both LLM providers receive the selected horizon template alongside the base and style prompts. The job and saved brief retain that choice and its resolved text even if settings later change. Earlier briefs without a recorded horizon keep their original metadata.
 
 Cash and interest-bearing deposits remain account funds. They are excluded from research inputs, position weights, concentration analysis and suggested funding. Research weights and reference amounts use invested securities market value. The five editable default prompts request concrete OPEN/ADD/REDUCE/CLOSE/HOLD/WATCH recommendations, target weights, staged sizes and triggers, in concise Markdown. Headings, emphasis, lists and GFM tables render directly in archived and new briefs. Historical brief content remains unchanged; generate a new brief to use the new research rules.
 
