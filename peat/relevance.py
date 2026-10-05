@@ -91,7 +91,7 @@ def select_news(db: Database, uid: int, limit: int = 30):
                 "weight": max(sectors.get(key, {}).get("weight", 0), held["weight"] if held else 0),
             }
     candidates = db.all(
-        "SELECT id,title,substr(content,1,1600) AS content,topic,source,url,published_at,fetched_at "
+        "SELECT id,fingerprint,title,substr(content,1,1600) AS content,topic,source,url,published_at,fetched_at "
         "FROM news WHERE user_id=?",
         (uid,),
     )

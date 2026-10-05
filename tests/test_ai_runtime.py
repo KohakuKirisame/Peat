@@ -72,7 +72,8 @@ def test_runtime_isolation_device_code_redaction_and_version_validation(tmp_path
     monkeypatch.setenv("OPENAI_API_KEY", "host-secret")
     env = runtime.env(1)
     assert "OPENAI_API_KEY" not in env
-    assert env["CODEX_HOME"] != runtime.env(2)["CODEX_HOME"]
+    assert env["CODEX_HOME"] == runtime.env(2)["CODEX_HOME"]
+    assert env["HOME"] != runtime.env(2)["HOME"]
     assert str(tmp_path) in env["CODEX_HOME"]
     runtime.jobs["login"] = {
         "id": "login",

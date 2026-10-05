@@ -51,8 +51,9 @@ class NewsService:
         self.reader = ArticleReader()
         self.body_locks = {}
         self.body_slots = asyncio.Semaphore(3)
+        self.body_retries = {}
 
-    async def full_text(self, uid: int, article_id: int):
+    async def full_text(self, uid: int, article_id: int, refresh=False):
         article = self.db.one("SELECT * FROM news WHERE id=? AND user_id=?", (article_id, uid))
         if not article:
             raise HTTPException(404, "news_not_found")
@@ -63,16 +64,29 @@ class NewsService:
             ):
                 raise HTTPException(404, "news_not_found")
             cached = self.db.one("SELECT * FROM news_bodies WHERE news_id=?", (article_id,))
-            if cached and (
-                cached["status"] == "ready"
-                or (datetime.now(timezone.utc) - datetime.fromisoformat(cached["fetched_at"])).total_seconds()
-                < 300
-            ):
-                return cached
+            if cached:
+                if cached["status"] == "ready":
+                    return cached
+                age = (
+                    datetime.now(timezone.utc) - datetime.fromisoformat(cached["fetched_at"])
+                ).total_seconds()
+                delay = (
+                    60
+                    if cached["error"]
+                    in {"article_timeout", "article_source_temporary", "article_rate_limited"}
+                    else 300
+                )
+                if not refresh and age < delay:
+                    return cached
+            if refresh:
+                key = (uid, article_id)
+                if time.monotonic() - self.body_retries.get(key, -10) < 5:
+                    raise HTTPException(429, "article_retry_later", headers={"Retry-After": "5"})
+                self.body_retries[key] = time.monotonic()
             result = {
                 "news_id": article_id,
                 "content": "",
-                "source_url": article["url"],
+                "source_url": cached["source_url"] if cached else article["url"],
                 "fetched_at": now(),
                 "status": "unavailable",
                 "error": None,
@@ -80,11 +94,15 @@ class NewsService:
             }
             try:
                 async with self.body_slots:
-                    async with asyncio.timeout(25):
-                        extracted = await self.reader.read(article["url"])
+                    async with asyncio.timeout(60):
+                        extracted = await self.reader.read(
+                            result["source_url"], expected_title=article["title"]
+                        )
                 result.update(extracted, status="ready", fetched_at=now())
             except (ProviderError, TimeoutError) as exc:
                 result["error"] = exc.code if isinstance(exc, ProviderError) else "article_timeout"
+                if getattr(exc, "source_url", None):
+                    result["source_url"] = exc.source_url
             # A retention cleanup may have removed/replaced this ID during the request.
             self.db.execute(
                 "INSERT INTO news_bodies(news_id,content,source_url,fetched_at,status,error,truncated) "
@@ -109,7 +127,7 @@ class NewsService:
         # Candidates have already been selected for holdings/industry relevance, not timestamp order.
         # Reuse cached bodies and bound total acquisition time while retaining every selected excerpt.
         try:
-            async with asyncio.timeout(45):
+            async with asyncio.timeout(90):
                 await asyncio.gather(
                     *(self.full_text(uid, article["id"]) for article in articles), return_exceptions=True
                 )

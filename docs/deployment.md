@@ -44,9 +44,9 @@ For LAN access without a proxy, explicitly change the Compose port binding and `
 
 ## Backups
 
-Stop the service before copying the data directory or taking a volume snapshot. Preserve `peat.sqlite3`, `master.key`, user Codex directories and runtime override markers. With an externally provided encryption key, back it up in your secret manager as well. Restoring a database without its key cannot recover API credentials.
+Stop the service before copying the data directory or taking a volume snapshot. Preserve `peat.sqlite3`, `master.key`, `codex-shared.json`, shared and legacy user Codex directories, and runtime override markers. With an externally provided encryption key, back it up in your secret manager as well. Restoring a database without its key cannot recover API credentials.
 
-停止服务后复制完整数据目录或创建数据卷快照。保留 `peat.sqlite3`、`master.key`、用户 Codex 目录和运行版本标记。外部提供的加密密钥还需单独备份；仅恢复数据库无法解密 API 凭据。
+停止服务后复制完整数据目录或创建数据卷快照。保留 `peat.sqlite3`、`master.key`、`codex-shared.json`、共享及历史用户 Codex 目录和运行版本标记。外部提供的加密密钥还需单独备份；仅恢复数据库无法解密 API 凭据。
 
 ## Dependency maintenance
 
@@ -56,9 +56,21 @@ Settings → Runtime can install an exact Codex or `exchange-calendars` version.
 
 ## Codex
 
-The image includes Codex `0.155.1` by default; the build argument `CODEX_VERSION` selects another exact version. Peat executes device login and model discovery under each user's `CODEX_HOME`. It passes research context through stdin, avoids inherited API key environment variables, disables agent tools and does not pass trading credentials to the model. Device authorization itself must be completed by the account owner in the official login page.
+The image includes Codex `0.155.1` by default; the build argument `CODEX_VERSION` selects another exact version. An administrator completes Settings → Start device login once and all Peat users can select Codex models for research. Only administrators can log in or disconnect the shared account. Device authorization is completed by the account owner on the official login page.
 
-默认镜像包含 Codex `0.155.1`，可通过构建参数 `CODEX_VERSION` 选择版本。设备登录与模型发现使用用户独立的 `CODEX_HOME`；研究上下文从 stdin 传入，屏蔽宿主 API Key 环境变量并禁用 agent 工具，交易凭据不会发送给模型。设备授权由账户所有者在官方页面完成。
+默认镜像包含 Codex `0.155.1`，可通过构建参数 `CODEX_VERSION` 选择版本。管理员在“设置 → 开始设备登录”完成一次授权后，所有 Peat 用户均可选择 Codex 模型进行研究；登录和退出仅限管理员。设备授权由账户所有者在官方页面完成。
+
+`CODEX_HOME` points to the directory recorded in `data/codex-shared.json`. On first use after upgrade, Peat adopts an existing active administrator's login under `users/<id>/codex` without copying tokens. New device logins use `shared/codex`. Keep both the marker and its selected directory when backing up. Signing out does not fall back to another stored account. Credentials are never returned to the browser. `HOME`, temporary files and research workspaces remain per user; inference is ephemeral, ignores user configuration and disables tools. Research enters through stdin with no inherited host API keys or trading credentials.
+
+`CODEX_HOME` 指向 `data/codex-shared.json` 记录的目录。升级后首次使用会沿用活跃管理员在 `users/<id>/codex` 中的登录状态，不复制令牌；新的设备登录使用 `shared/codex`。备份需保留该标记及其指向的目录。退出后不会自动切换到另一历史账户。凭据不返回浏览器；`HOME`、临时文件和研究工作目录仍按用户独立。研究使用临时会话、忽略用户配置并禁用工具；上下文从 stdin 传入，不继承宿主 API Key 或传入交易凭据。
+
+## Background research / 后台研究
+
+Generation runs independently of browser connections. There is no Peat timeout on the model request or Codex inference; the global task bar provides a manual Stop button. Network limits for model discovery and news acquisition remain separate. A service restart interrupts active work and keeps its status for the next visit; users can generate again after restart. Keep one application process per data directory.
+
+生成任务独立于浏览器连接运行。Peat 不对模型请求或 Codex 推理设置超时，全局任务栏提供手动中止。模型列表和新闻获取各自保留网络时限。服务重启会中断正在运行的任务，并保留状态供下次访问查看；重启后可重新生成。每个数据目录运行一个应用进程。
+
+## Administrator console / 管理员控制台
 
 The Web console is separate from AI research: authenticated administrators can intentionally execute server commands, with a 60-second timeout and a bounded output buffer. It is not a PTY/full-screen terminal. Set `PEAT_CONSOLE_ENABLED=false` to disable it for a hosted deployment.
 

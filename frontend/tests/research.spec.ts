@@ -55,7 +55,8 @@ test("research renders Markdown safely and news expands cached full text on mobi
     url: "https://publisher.example/story",
     published_at: "2026-10-05T12:00:00Z",
   };
-  let bodyRequests = 0;
+  let bodyRequests = 0,
+    retries = 0;
   await page.route("**/api/**", (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/news/1/fulltext") {
@@ -68,6 +69,20 @@ test("research renders Markdown safely and news expands cached full text on mobi
           source_url: article.url,
           fetched_at: "2026-10-05T12:00:00Z",
           truncated: false,
+        },
+      });
+    }
+    if (
+      path === "/api/news/2/fulltext" &&
+      new URL(route.request().url()).searchParams.get("refresh") === "true"
+    ) {
+      retries++;
+      return route.fulfill({
+        json: {
+          status: "ready",
+          content: "Retry recovered the readable article body.",
+          source_url: article.url,
+          fetched_at: "2026-10-05T12:00:00Z",
         },
       });
     }
@@ -133,6 +148,11 @@ test("research renders Markdown safely and news expands cached full text on mobi
     .filter({ hasText: "正文不可用测试" });
   await second.getByRole("button", { name: "展开全文" }).click();
   await expect(second.getByRole("link", { name: "打开原文" })).toBeVisible();
+  await second.getByRole("button", { name: "重试获取", exact: true }).click();
+  await expect(second.locator(".article-fulltext")).toContainText(
+    "Retry recovered",
+  );
+  expect(retries).toBe(1);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: "../.cache/screenshots/news-fulltext-fixture.png",

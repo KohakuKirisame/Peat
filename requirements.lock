@@ -698,6 +698,7 @@ lxml==6.1.3 \
     --hash=sha256:febd35ef45f603c2d74b74655efdbf45e14f55fc0aef4ac82b663ca829b283e0 \
     --hash=sha256:ff88a92cafde90888511242d1c54afcc1a8adbb6dc0a88fa7f87e29e92400d4a
     # via
+    #   peat-invest (pyproject.toml)
     #   htmldate
     #   justext
     #   lxml-html-clean

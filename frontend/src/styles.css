@@ -3223,3 +3223,68 @@ html[data-theme="dark"] .peat-topography {
   white-space: nowrap;
   flex-shrink: 0;
 }
+
+.analysis-task-banner {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin: 20px 35px 0;
+  padding: 15px 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  background: var(--tint);
+  color: var(--accent-ink);
+  border-radius: 9px;
+}
+.analysis-task-copy {
+  flex: 1;
+  min-width: 0;
+}
+.analysis-task-copy strong {
+  font-size: 12px;
+  display: block;
+}
+.analysis-task-copy span {
+  display: block;
+  font-size: 10px;
+  color: var(--subtle);
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+.analysis-task-actions {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.analysis-task-banner.failed,
+.analysis-task-banner.interrupted {
+  border-color: color-mix(in srgb, var(--amber) 35%, var(--border));
+}
+.analysis-task-banner.failed > svg {
+  color: var(--red);
+}
+@media (max-width: 760px) {
+  .analysis-task-banner {
+    margin: 15px 18px 0;
+    padding: 14px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .analysis-task-copy {
+    flex-basis: calc(100% - 40px);
+  }
+  .analysis-task-actions {
+    margin-left: 29px;
+  }
+  .analysis-task-actions .button {
+    font-size: 10px;
+  }
+}
+
+.article-retry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}

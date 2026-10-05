@@ -33,6 +33,7 @@ import { MarketsPanel, Overview, Watchlist } from "./Overview";
 import Intelligence from "./Intelligence";
 import { History, News } from "./NewsHistory";
 import Settings, { Admin, Console } from "./Settings";
+import { AnalysisTasks, AnalysisTaskBanner } from "./AnalysisTasks";
 
 export default function App() {
   const settingsQueue = useRef<Promise<unknown>>(Promise.resolve());
@@ -135,256 +136,259 @@ export default function App() {
     return <Auth onLogin={setUser} lang={guestLang} setLang={setGuestLang} />;
   return (
     <Context.Provider value={{ user, t, saveSettings, notify }}>
-      <a href="#main-content" className="skip-link">
-        {t("Skip to content", "跳至正文")}
-      </a>
-      <div className="app-shell">
-        {mobile && (
-          <button
-            className="sidebar-overlay"
-            aria-label={t("Close navigation", "关闭导航")}
-            onClick={() => setMobile(false)}
-          />
-        )}
-        <aside className={`sidebar ${mobile ? "is-open" : ""}`}>
-          <button className="brand" onClick={() => navigate("overview")}>
-            <img src="/peat-logo.png" alt="" />
-            <span>
-              Peat<span className="brand-dot">.</span>
-            </span>
-          </button>
-          <div className="workspace-switch">
-            <div className="workspace-icon">
-              <Leaf size={18} />
-            </div>
-            <div>
-              <strong>{t("Personal workspace", "个人工作台")}</strong>
-              <small>{t("Investment intelligence", "投资研究助手")}</small>
-            </div>
-            <ChevronRight size={14} />
-          </div>
-          <div className="nav-label">{t("WORKSPACE", "工作台")}</div>
-          <nav aria-label={t("Main navigation", "主导航")}>
-            {nav.map(([key, Icon, label]) => (
-              <button
-                key={key}
-                onClick={() => navigate(key)}
-                className={page === key ? "active" : ""}
-                aria-current={page === key ? "page" : undefined}
-              >
-                <Icon size={18} />
-                <span>{label}</span>
-                {key === "intelligence" && <span className="nav-ai">AI</span>}
-              </button>
-            ))}
-          </nav>
-          <div className="sidebar-bottom">
-            <div className="nav-label">{t("MANAGE", "管理")}</div>
-            <nav>
-              <button
-                onClick={() => navigate("settings")}
-                className={page === "settings" ? "active" : ""}
-              >
-                <SettingsIcon size={18} />
-                <span>{t("Settings", "设置")}</span>
-              </button>
-              {user.role === "admin" && (
-                <>
-                  <button
-                    onClick={() => navigate("console")}
-                    className={page === "console" ? "active" : ""}
-                  >
-                    <Terminal size={18} />
-                    <span>{t("Console", "本地控制台")}</span>
-                  </button>
-                  <button
-                    onClick={() => navigate("admin")}
-                    className={page === "admin" ? "active" : ""}
-                  >
-                    <Users size={18} />
-                    <span>{t("People", "用户管理")}</span>
-                  </button>
-                </>
-              )}
-            </nav>
-            <div className="sidebar-note">
-              <Sprout size={19} />
-              <p>
-                {t(
-                  "Stay curious.\nInvest thoughtfully.",
-                  "保持好奇，\n审慎思考。",
-                )}
-              </p>
-            </div>
-            <div className="user-menu">
-              <span className="user-avatar">
-                {user.username.slice(0, 2).toUpperCase()}
-              </span>
-              <div>
-                <strong>{user.username}</strong>
-                <small>
-                  {user.role === "admin"
-                    ? t("Administrator", "超级管理员")
-                    : t("Member", "用户")}
-                </small>
-              </div>
-              <button
-                className="icon-button"
-                aria-label={t("Sign out", "退出登录")}
-                onClick={async () => {
-                  try {
-                    await post("/auth/logout");
-                    setUser(null);
-                  } catch (e) {
-                    notify(errorMessage(e, t), true);
-                  }
-                }}
-              >
-                <LogOut size={16} />
-              </button>
-            </div>
-          </div>
-        </aside>
-        <div className="workspace-main">
-          <header className="topbar">
-            <div className="breadcrumb">
-              <button
-                className="icon-button mobile-menu"
-                aria-label={t("Open navigation", "打开导航")}
-                onClick={() => setMobile(true)}
-              >
-                <Menu size={21} />
-              </button>
-              <span>Workspace</span>
-              <ChevronRight size={13} />
-              <strong>
-                {nav.find((n) => n[0] === page)?.[2] ||
-                  (
-                    {
-                      settings: t("Settings", "设置"),
-                      console: t("Console", "控制台"),
-                      admin: t("People", "用户管理"),
-                    } as Record<string, string>
-                  )[page] ||
-                  t("Overview", "总览")}
-              </strong>
-            </div>
-            <div className="topbar-actions">
-              <span className="today">
-                {new Date().toLocaleDateString(
-                  lang === "zh" ? "zh-CN" : "en-GB",
-                  { day: "numeric", month: "short", year: "numeric" },
-                )}
-              </span>
-              <button
-                className="icon-button language-toggle"
-                onClick={() =>
-                  saveSettings({
-                    ...user.settings,
-                    language: lang === "en" ? "zh" : "en",
-                  }).catch((e) => notify(errorMessage(e, t), true))
-                }
-                aria-label={t("Switch to Chinese", "Switch to English")}
-              >
-                {lang === "en" ? "中" : "EN"}
-              </button>
-              <button
-                className="icon-button"
-                aria-label={t("Toggle theme", "切换主题")}
-                onClick={() =>
-                  saveSettings({
-                    ...user.settings,
-                    theme:
-                      document.documentElement.dataset.theme === "dark"
-                        ? "light"
-                        : "dark",
-                  }).catch((e) => notify(errorMessage(e, t), true))
-                }
-              >
-                {document.documentElement.dataset.theme === "dark" ? (
-                  <Sun size={18} />
-                ) : (
-                  <Moon size={18} />
-                )}
-              </button>
-              <span className="header-avatar">
-                {user.username[0].toUpperCase()}
-              </span>
-            </div>
-          </header>
-          <main id="main-content" className="content" key={page}>
-            {page === "overview" ? (
-              <Overview navigate={navigate} />
-            ) : page === "portfolio" ? (
-              <Overview navigate={navigate} portfolioOnly />
-            ) : page === "watchlist" ? (
-              <Watchlist />
-            ) : page === "markets" ? (
-              <>
-                <div className="page-title">
-                  <div>
-                    <div className="eyebrow">
-                      {t("A WIDER PERSPECTIVE", "拓展市场视野")}
-                    </div>
-                    <h1>{t("Global markets", "全球市场")}</h1>
-                    <p>
-                      {t(
-                        "Rates, resources and exchange sessions, in one view.",
-                        "集中查看利率、商品价格和交易时段。",
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <div className="markets-page">
-                  <MarketsPanel full />
-                </div>
-              </>
-            ) : page === "news" ? (
-              <News />
-            ) : page === "intelligence" ? (
-              <Intelligence />
-            ) : page === "history" ? (
-              <History />
-            ) : page === "settings" ? (
-              <Settings />
-            ) : page === "console" && user.role === "admin" ? (
-              <Console />
-            ) : page === "admin" && user.role === "admin" ? (
-              <Admin />
-            ) : (
-              <Overview navigate={navigate} />
-            )}
-            <footer className="footer">
+      <AnalysisTasks key={user.id}>
+        <a href="#main-content" className="skip-link">
+          {t("Skip to content", "跳至正文")}
+        </a>
+        <div className="app-shell">
+          {mobile && (
+            <button
+              className="sidebar-overlay"
+              aria-label={t("Close navigation", "关闭导航")}
+              onClick={() => setMobile(false)}
+            />
+          )}
+          <aside className={`sidebar ${mobile ? "is-open" : ""}`}>
+            <button className="brand" onClick={() => navigate("overview")}>
+              <img src="/peat-logo.png" alt="" />
               <span>
-                Peat <b>·</b>{" "}
-                {t("Independent by design.", "独立研究，清晰判断。")}
+                Peat<span className="brand-dot">.</span>
               </span>
-              <a
-                href="https://github.com/KohakuKirisame/Peat"
-                target="_blank"
-                rel="noreferrer"
-              >
-                AGPL-3.0 <span>↗</span>
-              </a>
-            </footer>
-          </main>
+            </button>
+            <div className="workspace-switch">
+              <div className="workspace-icon">
+                <Leaf size={18} />
+              </div>
+              <div>
+                <strong>{t("Personal workspace", "个人工作台")}</strong>
+                <small>{t("Investment intelligence", "投资研究助手")}</small>
+              </div>
+              <ChevronRight size={14} />
+            </div>
+            <div className="nav-label">{t("WORKSPACE", "工作台")}</div>
+            <nav aria-label={t("Main navigation", "主导航")}>
+              {nav.map(([key, Icon, label]) => (
+                <button
+                  key={key}
+                  onClick={() => navigate(key)}
+                  className={page === key ? "active" : ""}
+                  aria-current={page === key ? "page" : undefined}
+                >
+                  <Icon size={18} />
+                  <span>{label}</span>
+                  {key === "intelligence" && <span className="nav-ai">AI</span>}
+                </button>
+              ))}
+            </nav>
+            <div className="sidebar-bottom">
+              <div className="nav-label">{t("MANAGE", "管理")}</div>
+              <nav>
+                <button
+                  onClick={() => navigate("settings")}
+                  className={page === "settings" ? "active" : ""}
+                >
+                  <SettingsIcon size={18} />
+                  <span>{t("Settings", "设置")}</span>
+                </button>
+                {user.role === "admin" && (
+                  <>
+                    <button
+                      onClick={() => navigate("console")}
+                      className={page === "console" ? "active" : ""}
+                    >
+                      <Terminal size={18} />
+                      <span>{t("Console", "本地控制台")}</span>
+                    </button>
+                    <button
+                      onClick={() => navigate("admin")}
+                      className={page === "admin" ? "active" : ""}
+                    >
+                      <Users size={18} />
+                      <span>{t("People", "用户管理")}</span>
+                    </button>
+                  </>
+                )}
+              </nav>
+              <div className="sidebar-note">
+                <Sprout size={19} />
+                <p>
+                  {t(
+                    "Stay curious.\nInvest thoughtfully.",
+                    "保持好奇，\n审慎思考。",
+                  )}
+                </p>
+              </div>
+              <div className="user-menu">
+                <span className="user-avatar">
+                  {user.username.slice(0, 2).toUpperCase()}
+                </span>
+                <div>
+                  <strong>{user.username}</strong>
+                  <small>
+                    {user.role === "admin"
+                      ? t("Administrator", "超级管理员")
+                      : t("Member", "用户")}
+                  </small>
+                </div>
+                <button
+                  className="icon-button"
+                  aria-label={t("Sign out", "退出登录")}
+                  onClick={async () => {
+                    try {
+                      await post("/auth/logout");
+                      setUser(null);
+                    } catch (e) {
+                      notify(errorMessage(e, t), true);
+                    }
+                  }}
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            </div>
+          </aside>
+          <div className="workspace-main">
+            <header className="topbar">
+              <div className="breadcrumb">
+                <button
+                  className="icon-button mobile-menu"
+                  aria-label={t("Open navigation", "打开导航")}
+                  onClick={() => setMobile(true)}
+                >
+                  <Menu size={21} />
+                </button>
+                <span>Workspace</span>
+                <ChevronRight size={13} />
+                <strong>
+                  {nav.find((n) => n[0] === page)?.[2] ||
+                    (
+                      {
+                        settings: t("Settings", "设置"),
+                        console: t("Console", "控制台"),
+                        admin: t("People", "用户管理"),
+                      } as Record<string, string>
+                    )[page] ||
+                    t("Overview", "总览")}
+                </strong>
+              </div>
+              <div className="topbar-actions">
+                <span className="today">
+                  {new Date().toLocaleDateString(
+                    lang === "zh" ? "zh-CN" : "en-GB",
+                    { day: "numeric", month: "short", year: "numeric" },
+                  )}
+                </span>
+                <button
+                  className="icon-button language-toggle"
+                  onClick={() =>
+                    saveSettings({
+                      ...user.settings,
+                      language: lang === "en" ? "zh" : "en",
+                    }).catch((e) => notify(errorMessage(e, t), true))
+                  }
+                  aria-label={t("Switch to Chinese", "Switch to English")}
+                >
+                  {lang === "en" ? "中" : "EN"}
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label={t("Toggle theme", "切换主题")}
+                  onClick={() =>
+                    saveSettings({
+                      ...user.settings,
+                      theme:
+                        document.documentElement.dataset.theme === "dark"
+                          ? "light"
+                          : "dark",
+                    }).catch((e) => notify(errorMessage(e, t), true))
+                  }
+                >
+                  {document.documentElement.dataset.theme === "dark" ? (
+                    <Sun size={18} />
+                  ) : (
+                    <Moon size={18} />
+                  )}
+                </button>
+                <span className="header-avatar">
+                  {user.username[0].toUpperCase()}
+                </span>
+              </div>
+            </header>
+            <AnalysisTaskBanner navigate={navigate} />
+            <main id="main-content" className="content" key={page}>
+              {page === "overview" ? (
+                <Overview navigate={navigate} />
+              ) : page === "portfolio" ? (
+                <Overview navigate={navigate} portfolioOnly />
+              ) : page === "watchlist" ? (
+                <Watchlist />
+              ) : page === "markets" ? (
+                <>
+                  <div className="page-title">
+                    <div>
+                      <div className="eyebrow">
+                        {t("A WIDER PERSPECTIVE", "拓展市场视野")}
+                      </div>
+                      <h1>{t("Global markets", "全球市场")}</h1>
+                      <p>
+                        {t(
+                          "Rates, resources and exchange sessions, in one view.",
+                          "集中查看利率、商品价格和交易时段。",
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="markets-page">
+                    <MarketsPanel full />
+                  </div>
+                </>
+              ) : page === "news" ? (
+                <News />
+              ) : page === "intelligence" ? (
+                <Intelligence />
+              ) : page === "history" ? (
+                <History />
+              ) : page === "settings" ? (
+                <Settings />
+              ) : page === "console" && user.role === "admin" ? (
+                <Console />
+              ) : page === "admin" && user.role === "admin" ? (
+                <Admin />
+              ) : (
+                <Overview navigate={navigate} />
+              )}
+              <footer className="footer">
+                <span>
+                  Peat <b>·</b>{" "}
+                  {t("Independent by design.", "独立研究，清晰判断。")}
+                </span>
+                <a
+                  href="https://github.com/KohakuKirisame/Peat"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  AGPL-3.0 <span>↗</span>
+                </a>
+              </footer>
+            </main>
+          </div>
         </div>
-      </div>
-      {toast && (
-        <div
-          className={`toast ${toast.error ? "error" : ""}`}
-          role={toast.error ? "alert" : "status"}
-        >
-          {toast.error ? <CircleAlertIcon /> : <Check size={18} />}
-          <span>{toast.text}</span>
-          <button
-            aria-label={t("Dismiss", "关闭")}
-            onClick={() => setToast(null)}
+        {toast && (
+          <div
+            className={`toast ${toast.error ? "error" : ""}`}
+            role={toast.error ? "alert" : "status"}
           >
-            <X size={15} />
-          </button>
-        </div>
-      )}
+            {toast.error ? <CircleAlertIcon /> : <Check size={18} />}
+            <span>{toast.text}</span>
+            <button
+              aria-label={t("Dismiss", "关闭")}
+              onClick={() => setToast(null)}
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
+      </AnalysisTasks>
     </Context.Provider>
   );
 }

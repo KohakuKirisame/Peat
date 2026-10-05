@@ -78,6 +78,18 @@ export const put = <T = any>(path: string, body: unknown) =>
 export const del = (path: string) => api(path, { method: "DELETE" });
 
 const errors: Record<string, [string, string]> = {
+  analysis_interrupted: [
+    "The server restarted during generation. Start a new brief.",
+    "服务重启导致生成中断，请重新生成。",
+  ],
+  analysis_failed: [
+    "Generation failed. Check your provider connection and retry.",
+    "生成失败，请检查平台连接后重试。",
+  ],
+  article_retry_later: [
+    "Please wait a few seconds before retrying.",
+    "请稍等几秒后重试。",
+  ],
   login_required: ["Please sign in again.", "请重新登录。"],
   invalid_credentials: [
     "Incorrect username or password.",
@@ -150,12 +162,12 @@ const errors: Record<string, [string, string]> = {
     "Codex 尚未安装，管理员可在设置中安装。",
   ],
   codex_models_unavailable: [
-    "Could not read Codex models. Check your device login.",
-    "无法读取 Codex 模型，请检查设备登录。",
+    "Could not read Codex models. Ask an administrator to check the shared login.",
+    "无法读取 Codex 模型，请管理员检查共享登录状态。",
   ],
   codex_analysis_failed: [
-    "Codex could not complete the analysis. Check login and model access.",
-    "Codex 分析失败，请检查登录状态与模型权限。",
+    "Codex could not complete the analysis. Check the shared login and model access.",
+    "Codex 分析失败，请检查共享登录状态与模型权限。",
   ],
   ai_request_failed: [
     "The AI request failed. Check the endpoint, model and credentials.",

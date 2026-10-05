@@ -358,8 +358,8 @@ export default function Settings() {
                   <h3>Codex CLI</h3>
                   <p>
                     {t(
-                      "Sign in with your ChatGPT account",
-                      "通过 ChatGPT 账户登录",
+                      "Administrator connection · shared across the workspace",
+                      "管理员连接 · 全站共享",
                     )}
                   </p>
                 </div>
@@ -370,10 +370,20 @@ export default function Settings() {
                 </Tag>
               </div>
               <p className="field-hint">
-                {t(
-                  "Start device login, open the verification page, and enter the code. Enable device-code login in your ChatGPT security settings if requested.",
-                  "开始设备登录，打开验证页面并输入设备码。需要时在 ChatGPT 安全设置中启用设备码登录。",
-                )}
+                {user.role === "admin"
+                  ? t(
+                      "Sign in once to make Codex available to all workspace users. Open the verification page and enter the device code.",
+                      "管理员登录后，全站用户即可使用 Codex。打开验证页面并输入设备码完成登录。",
+                    )
+                  : codex.data?.logged_in
+                    ? t(
+                        "Codex is connected by an administrator. Choose Codex and a model in Intelligence.",
+                        "管理员已连接 Codex，可在智能研究中选择 Codex 和模型。",
+                      )
+                    : t(
+                        "An administrator needs to connect Codex before it can be used.",
+                        "等待管理员连接 Codex 后即可使用。",
+                      )}
               </p>
               {loginJob && (
                 <div className="device-login" aria-live="polite">
@@ -411,34 +421,36 @@ export default function Settings() {
                   <RefreshCw size={15} />
                   {t("Check status", "检查状态")}
                 </button>
-                <Button
-                  secondary
-                  busy={action.busy}
-                  disabled={!!loginJob && login.data?.status === "running"}
-                  onClick={() =>
-                    action.run(async () => {
-                      if (codex.data?.logged_in) {
-                        await post("/codex/logout");
-                        codex.reload();
-                      } else {
-                        const result = await post("/codex/login");
-                        setLoginJob(result.job_id);
-                      }
-                    })
-                  }
-                >
-                  {codex.data?.logged_in ? (
-                    <>
-                      <LogOut size={16} />
-                      {t("Sign out", "退出登录")}
-                    </>
-                  ) : (
-                    <>
-                      <ExternalLink size={16} />
-                      {t("Start device login", "开始设备登录")}
-                    </>
-                  )}
-                </Button>
+                {user.role === "admin" && (
+                  <Button
+                    secondary
+                    busy={action.busy}
+                    disabled={!!loginJob && login.data?.status === "running"}
+                    onClick={() =>
+                      action.run(async () => {
+                        if (codex.data?.logged_in) {
+                          await post("/codex/logout");
+                          codex.reload();
+                        } else {
+                          const result = await post("/codex/login");
+                          setLoginJob(result.job_id);
+                        }
+                      })
+                    }
+                  >
+                    {codex.data?.logged_in ? (
+                      <>
+                        <LogOut size={16} />
+                        {t("Disconnect shared Codex", "断开共享 Codex")}
+                      </>
+                    ) : (
+                      <>
+                        <ExternalLink size={16} />
+                        {t("Start device login", "开始设备登录")}
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
           </Panel>

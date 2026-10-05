@@ -7,7 +7,7 @@ FastAPI ──┼── SQLite: users, settings, encrypted API credentials
           ├── Trading212 adapter (GET allowlist only)
           ├── Markets + Charts: Treasury XML / Yahoo chart feed
           ├── News: Google RSS → plain text → per-user retention
-          ├── Intelligence: OpenAI-compatible API / isolated Codex CLI
+          ├── Intelligence: persisted background tasks → OpenAI API / shared Codex login
           └── Runtime: device-login jobs, dependency installs, admin console
 ```
 
@@ -37,19 +37,23 @@ Treasury data is fetched from the official daily yield XML feed. Time-series obs
 
 ## News and AI
 
-News topics are derived from held company names, watchlist names and industry keywords. Entries are deduplicated by URL and stripped of HTML. Retention applies both count and age limits per user. Article bodies are fetched on expansion or when selected for research, extracted as plain text with Trafilatura and cached in a per-article table with cascading retention. Every redirect is revalidated and DNS-pinned to a public address, with no browser credentials. Response size and fetch duration are bounded. Subscription/blocked pages retain an original-article link.
+News topics are derived from held company names, watchlist names and industry keywords. Entries are deduplicated by URL and stripped of HTML. Retention applies both count and age limits per user. Article bodies are fetched on expansion or when selected for research and cached in a per-article table with cascading retention. Google News resolution handles legacy encoded links, redirects and framed RPC responses. Extraction combines main-article JSON-LD, Trafilatura's standard/recall fallbacks and explicit article paragraphs. If needed, it follows up to two declared AMP/canonical alternatives. Access declarations are matched to the main article, avoiding false subscription detection from related stories.
+
+Every redirect is revalidated and DNS-pinned to a public address, with no browser credentials. Response size is capped at 4 MB and per-article acquisition at 60 seconds. Temporary transport and server failures get up to three attempts with backoff. Failed cache entries expire sooner than successful text and can be manually retried, with a five-second retry throttle. Subscription/blocked pages retain the resolved original-article link and a specific reason.
 
 Analysis uses a securities-only projection of the portfolio: account total value, cash, reserved cash and interest-bearing deposits are omitted, and weights use securities market value. The raw account cache and funds UI retain these balances.
 
-News selection scores every cached headline/excerpt against held companies, security weights, watchlist companies and configured industry terms. Recency is a secondary signal. Coverage is reserved for relevant holdings/industries before filling up to 30 slots; repeated headlines are deduplicated and source diversity is considered. These selected stories, rather than the latest N rows, are passed to body acquisition under a 45-second total budget. Retrieved text has a shared 30,000-character input budget; remaining relevant excerpts stay in context. Selection reasons and content type are archived with the evidence.
+News selection scores every cached headline/excerpt against held companies, security weights, watchlist companies and configured industry terms. Recency is a secondary signal. Coverage is reserved for relevant holdings/industries before filling up to 30 slots; repeated headlines are deduplicated and source diversity is considered. Selected stories enter body acquisition under a 90-second total budget with three concurrent downloads. Retrieved text has a shared 30,000-character input budget; remaining relevant excerpts stay in context. The portfolio, watchlist and selected stories are captured together; concurrent retention or row-ID reuse cannot replace a selected story. Selection reasons and content type are archived with the evidence.
 
 Default prompts request explicit OPEN/ADD/REDUCE/CLOSE/HOLD/WATCH plans with securities-based target weights, reference sizes and triggers, using concise direct wording. Users can replace the shared prompt and each style prompt. All inputs, resolved prompts, provider, model, effort and output are archived together. React Markdown plus GFM renders brief structure while raw HTML and remote images remain disabled.
 
-OpenAI-compatible providers receive Chat Completions requests. `reasoning_effort` is omitted for Auto and passed without silent fallback otherwise. Provider rejection is surfaced. Codex models and allowed efforts come from app-server `model/list`; selected combinations are validated before inference. Codex processes use their own per-user HOME/CODEX_HOME and research workspace with tools disabled. Neither broker keys nor OpenAI keys enter the research context.
+OpenAI-compatible providers receive Chat Completions requests. `reasoning_effort` is omitted for Auto and passed without silent fallback otherwise. Provider rejection is surfaced. Codex models and allowed efforts come from app-server `model/list`; selected combinations are validated before inference. Codex uses an administrator-managed shared `CODEX_HOME`, per-user `HOME` and research workspace, and ephemeral runs with tools disabled. Neither broker keys nor OpenAI keys enter the research context. Only administrators can initiate device login or logout; model discovery and inference are available to all authenticated users. Login changes invalidate every user's Codex model cache.
+
+`POST /api/ai/analyze` returns a job with HTTP 202 immediately. SQLite `analysis_jobs` stores owner, captured settings, phase, terminal status and report ID, with a unique active-job constraint per user. A process-level asyncio task runs independently of the HTTP connection. The browser polls `/api/ai/jobs/current` from a provider above page navigation; individual job lookup and cancellation are owner-scoped. Model inference has no application timeout. Cancellation closes the OpenAI request or signals a thread watcher to terminate the Codex process tree and wait for cleanup. Only completed output is stored as a report. Shutdown and restart mark unfinished jobs interrupted, without automatically rerunning a provider call.
 
 ## Operations
 
-The background loop updates configured portfolios and news at each user's interval. Market data is shared and cached. Manual refreshes use the same locks and throttles. Long-running AI calls run asynchronously; subprocess work is delegated to threads. Runtime jobs keep bounded output in memory and expire completed job metadata.
+The background loop updates configured portfolios and news at each user's interval. Market data is shared and cached. Manual refreshes use the same locks and throttles. Long-running AI calls run asynchronously; subprocess work and blocking connection setup are delegated to threads. Runtime maintenance jobs keep bounded output in memory and expire completed job metadata. Research job state is persisted separately.
 
 The app is single-process, suited to a local or small self-hosted workspace. Administrators have service-level trust because the console can run local commands. Normal users cannot reach administrative routes or other users' jobs.
 
@@ -66,4 +70,6 @@ SQLite 是本地事实存储；外部数据保留来源、时间与币种。Brok
 
 新闻保存 RSS 摘要并支持按需读取正文；研究按持仓与行业相关性选材，记录关联对象和正文来源。现金及计息 deposit 仅保留在账户资金中，简报使用证券持仓市值作为仓位基数。AI 分析保存完整输入证据和当时使用的提示词。用户选择的思考强度会传给平台，失败时不会自动切换成其他档位。Codex 模型能力来自运行实例的模型列表。
 
-数据、凭据和任务按用户隔离；管理员控制台属于实例运维权限。Git 与容器构建都排除运行数据。应用使用单进程轮询与进程内任务管理。
+研究任务入库后在后台运行，切换页面或刷新不会中断；模型生成不限时，用户可手动中止。服务重启后未完成任务标记为中断。新闻正文结合结构化文章、可读页面与 AMP 回退，并提供重试和具体失败原因。
+
+持仓、API 凭据、报告和任务按用户隔离；Codex 登录由管理员统一管理，全站共享，研究工作目录仍按用户独立。升级时通过私有目录标记沿用已有管理员登录。管理员控制台属于实例运维权限。Git 与容器构建都排除运行数据。应用使用单进程轮询与进程内任务管理。

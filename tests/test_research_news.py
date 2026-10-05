@@ -137,13 +137,25 @@ def test_research_keeps_the_portfolio_used_to_select_news(db):
     assert "cash" not in evidence["portfolio"]["data"]
 
 
+def test_background_research_keeps_selected_news_after_cleanup_and_id_reuse(db):
+    article = add_news(db, 1, "Apple original story", "Apple Inc")
+    selection = select_news(db, 1)
+    db.execute("DELETE FROM news WHERE id=?", (article,))
+    reused = add_news(db, 1, "Unrelated later story", "Sports")
+    assert reused == article
+    ai = Intelligence(db, None, None, None, Config(background=False))
+    evidence = ai.evidence(1, selection)
+    assert evidence["news"][0]["title"] == "Apple original story"
+    assert evidence["news"][0]["content_kind"] == "rss_excerpt"
+
+
 def test_article_schema_upgrade_keeps_existing_news(db):
     article = add_news(db, 1, "Apple retained article", "Apple Inc")
     db.execute("DROP TABLE news_bodies")
     db.execute("PRAGMA user_version=1")
     upgraded = Database(db.path)
     assert upgraded.one("SELECT id FROM news WHERE id=?", (article,))
-    assert upgraded.one("PRAGMA user_version")["user_version"] == 2
+    assert upgraded.one("PRAGMA user_version")["user_version"] == 3
 
 
 @pytest.mark.asyncio
@@ -212,7 +224,7 @@ def test_fulltext_is_cached_owned_and_deleted_with_news(tmp_path, monkeypatch):
     app = create_app(Config(data_dir=tmp_path, background=False))
     calls = []
 
-    async def read(url):
+    async def read(url, expected_title=None):
         calls.append(url)
         return {"content": "Fixture full article body. " * 20, "source_url": url, "truncated": False}
 

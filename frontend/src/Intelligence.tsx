@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Markdown } from "./Markdown";
+import { useAnalysisTask } from "./AnalysisTasks";
 import {
   ArrowUpRight,
   BookOpenText,
@@ -85,6 +86,7 @@ export function ModelControls({
       <label>
         {t("Provider", "平台")}
         <select
+          aria-label={t("Provider", "平台")}
           value={settings.ai_provider}
           onChange={(e) =>
             onChange({
@@ -152,8 +154,8 @@ export function ModelControls({
       <p className="field-hint full-width">
         {settings.ai_provider === "codex"
           ? t(
-              "Refresh models after device login. Effort options come from your Codex account.",
-              "设备登录后刷新模型，可用思考强度来自你的 Codex 账户。",
+              "Refresh models after the administrator connects Codex. Effort options come from the shared account.",
+              "管理员连接 Codex 后刷新模型，可用思考强度来自共享账户。",
             )
           : t(
               "Model IDs come from /models. Compatible providers may support different effort levels; Auto omits the parameter.",
@@ -165,6 +167,7 @@ export function ModelControls({
 }
 
 export default function Intelligence() {
+  const analysisTask = useAnalysisTask();
   const { t, user, saveSettings, notify } = useApp(),
     r = useResource<any[]>("/ai/analyses"),
     defaults = useResource("/ai/prompts");
@@ -177,6 +180,15 @@ export default function Intelligence() {
     save = useAction();
   useEffect(() => setSettings(user.settings), [user.settings]);
   const analysis = r.data?.find((a) => a.id === current) || r.data?.[0];
+  useEffect(() => {
+    if (
+      analysisTask.job?.status === "completed" &&
+      analysisTask.job.analysis_id
+    ) {
+      setCurrent(analysisTask.job.analysis_id);
+      r.reload();
+    }
+  }, [analysisTask.job?.id, analysisTask.job?.status]);
   const selectedStyle = styles.find((s) => s[0] === settings.style);
   return (
     <>
@@ -358,24 +370,23 @@ export default function Intelligence() {
             )}
             action={
               <Button
-                busy={action.busy}
+                busy={action.busy || analysisTask.starting}
+                disabled={analysisTask.active}
                 onClick={() =>
                   action.run(async () => {
                     await saveSettings(settings);
-                    const result = await post("/ai/analyze");
-                    r.reload();
-                    setCurrent(result.id);
+                    await analysisTask.start();
                   })
                 }
               >
                 <Sparkles size={16} />
-                {action.busy
-                  ? t("Researching…", "分析中…")
+                {analysisTask.active
+                  ? t("Running in background", "后台生成中")
                   : t("Generate brief", "生成简报")}
               </Button>
             }
           >
-            {action.busy && (
+            {analysisTask.active && (
               <div className="research-progress">
                 <div className="pulsing-orb">
                   <Sprout size={28} />
@@ -385,119 +396,115 @@ export default function Intelligence() {
                 </strong>
                 <p>
                   {t(
-                    "Reviewing holdings, rates, commodities and relevant news. This can take a few minutes.",
-                    "正在分析持仓、利率、商品与相关新闻，可能需要几分钟。",
+                    "You can use other pages or close this page. The task has no generation time limit; stop it from the status bar whenever needed.",
+                    "可以切换页面或关闭当前页面，任务会在后台继续。生成不设时限，可随时从状态栏手动中止。",
                   )}
                 </p>
               </div>
             )}
-            {!action.busy &&
-              (analysis ? (
-                <>
-                  <div className="brief-meta">
-                    <Tag tone="green">
-                      {
-                        styles.find((s) => s[0] === analysis.style)?.[
-                          user.settings.language === "zh" ? 2 : 1
-                        ]
-                      }
-                    </Tag>
-                    <span>
-                      {analysis.model} · {analysis.reasoning_effort}
-                    </span>
-                    <span>
-                      {date(analysis.created_at, user.settings.language)}
-                    </span>
-                  </div>
-                  <div className="brief-content">
-                    <Markdown content={analysis.content} />
-                  </div>
-                  <button
-                    className="text-button evidence-toggle"
-                    onClick={() => setEvidenceOpen(!evidenceOpen)}
-                  >
-                    <BookOpenText size={16} />
-                    {t("View evidence & saved prompt", "查看依据与当时提示词")}
-                    <ChevronDown size={16} />
-                  </button>
-                  {evidenceOpen && (
-                    <div className="evidence">
-                      <p>
-                        {t("Portfolio snapshot", "持仓快照")} ·{" "}
-                        {date(
-                          analysis.evidence?.portfolio?.updated_at,
-                          user.settings.language,
-                        )}
-                      </p>
-                      <p>
-                        {t("Market snapshot", "行情快照")} ·{" "}
-                        {date(
-                          analysis.evidence?.markets?.updated_at,
-                          user.settings.language,
-                        )}
-                      </p>
-                      {analysis.evidence?.news_selection && (
-                        <p>
-                          {t(
-                            "Relevant stories selected",
-                            "按持仓与行业筛选新闻",
-                          )}{" "}
-                          · {analysis.evidence.news_selection.selected_count}
-                          {" / "}
-                          {analysis.evidence.news_selection.candidate_count}
-                        </p>
+            {analysis ? (
+              <>
+                <div className="brief-meta">
+                  <Tag tone="green">
+                    {
+                      styles.find((s) => s[0] === analysis.style)?.[
+                        user.settings.language === "zh" ? 2 : 1
+                      ]
+                    }
+                  </Tag>
+                  <span>
+                    {analysis.model} · {analysis.reasoning_effort}
+                  </span>
+                  <span>
+                    {date(analysis.created_at, user.settings.language)}
+                  </span>
+                </div>
+                <div className="brief-content">
+                  <Markdown content={analysis.content} />
+                </div>
+                <button
+                  className="text-button evidence-toggle"
+                  onClick={() => setEvidenceOpen(!evidenceOpen)}
+                >
+                  <BookOpenText size={16} />
+                  {t("View evidence & saved prompt", "查看依据与当时提示词")}
+                  <ChevronDown size={16} />
+                </button>
+                {evidenceOpen && (
+                  <div className="evidence">
+                    <p>
+                      {t("Portfolio snapshot", "持仓快照")} ·{" "}
+                      {date(
+                        analysis.evidence?.portfolio?.updated_at,
+                        user.settings.language,
                       )}
-                      {analysis.evidence?.news?.map((n: any) => (
-                        <p key={n.id}>
-                          <span>[news {n.id}] </span>
-                          <External href={n.url}>{n.title}</External>
-                          {n.related_entities?.length > 0 && (
-                            <small className="evidence-related">
-                              {t("Related to", "关联")} ·{" "}
-                              {Array.from(
-                                new Set(
-                                  n.related_entities.map(
-                                    (entity: any) => entity.name,
-                                  ),
+                    </p>
+                    <p>
+                      {t("Market snapshot", "行情快照")} ·{" "}
+                      {date(
+                        analysis.evidence?.markets?.updated_at,
+                        user.settings.language,
+                      )}
+                    </p>
+                    {analysis.evidence?.news_selection && (
+                      <p>
+                        {t("Relevant stories selected", "按持仓与行业筛选新闻")}{" "}
+                        · {analysis.evidence.news_selection.selected_count}
+                        {" / "}
+                        {analysis.evidence.news_selection.candidate_count}
+                      </p>
+                    )}
+                    {analysis.evidence?.news?.map((n: any) => (
+                      <p key={n.id}>
+                        <span>[news {n.id}] </span>
+                        <External href={n.url}>{n.title}</External>
+                        {n.related_entities?.length > 0 && (
+                          <small className="evidence-related">
+                            {t("Related to", "关联")} ·{" "}
+                            {Array.from(
+                              new Set(
+                                n.related_entities.map(
+                                  (entity: any) => entity.name,
                                 ),
-                              ).join(" · ")}
-                              {" · "}
-                              {n.content_kind === "rss_excerpt"
-                                ? t("RSS excerpt", "RSS 摘要")
-                                : t("Article text", "新闻正文")}
-                            </small>
-                          )}
-                        </p>
-                      ))}
-                      <details>
-                        <summary>
-                          {t(
-                            "Prompt used for this brief",
-                            "本次简报使用的提示词",
-                          )}
-                        </summary>
-                        <pre>
-                          {analysis.evidence?.prompts?.base}
-                          {"\n\n"}
-                          {analysis.evidence?.prompts?.style}
-                        </pre>
-                      </details>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <Empty
-                  icon={<Sparkles size={25} />}
-                  title={t(
-                    "Your next insight starts here",
-                    "从这里开始你的下一份洞察",
-                  )}
-                  body={t(
-                    "Choose your style and model, then generate a brief from your connected data.",
-                    "选择投资风格和模型，使用已连接的数据生成研究简报。",
-                  )}
-                />
-              ))}
+                              ),
+                            ).join(" · ")}
+                            {" · "}
+                            {n.content_kind === "rss_excerpt"
+                              ? t("RSS excerpt", "RSS 摘要")
+                              : t("Article text", "新闻正文")}
+                          </small>
+                        )}
+                      </p>
+                    ))}
+                    <details>
+                      <summary>
+                        {t(
+                          "Prompt used for this brief",
+                          "本次简报使用的提示词",
+                        )}
+                      </summary>
+                      <pre>
+                        {analysis.evidence?.prompts?.base}
+                        {"\n\n"}
+                        {analysis.evidence?.prompts?.style}
+                      </pre>
+                    </details>
+                  </div>
+                )}
+              </>
+            ) : (
+              <Empty
+                icon={<Sparkles size={25} />}
+                title={t(
+                  "Your next insight starts here",
+                  "从这里开始你的下一份洞察",
+                )}
+                body={t(
+                  "Choose your style and model, then generate a brief from your connected data.",
+                  "选择投资风格和模型，使用已连接的数据生成研究简报。",
+                )}
+              />
+            )}
             {!!r.error && <ResourceError error={r.error} retry={r.reload} />}
           </Panel>
         </div>

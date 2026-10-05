@@ -74,6 +74,15 @@ CREATE TABLE IF NOT EXISTS analyses (
  provider TEXT NOT NULL, model TEXT NOT NULL, style TEXT NOT NULL, content TEXT NOT NULL,
  evidence TEXT NOT NULL, created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS analysis_jobs (
+ id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ status TEXT NOT NULL, phase TEXT NOT NULL, settings TEXT NOT NULL, error TEXT,
+ analysis_id INTEGER REFERENCES analyses(id) ON DELETE SET NULL,
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL, finished_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS one_active_analysis_per_user ON analysis_jobs(user_id)
+ WHERE status IN ('queued','running','cancelling');
+CREATE INDEX IF NOT EXISTS analysis_jobs_user_date ON analysis_jobs(user_id,created_at DESC);
 CREATE TABLE IF NOT EXISTS statement_rows (
  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  fingerprint TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(user_id,fingerprint)
@@ -92,7 +101,7 @@ class Database:
         with self.connect() as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.executescript(SCHEMA)
-            conn.execute("PRAGMA user_version=2")
+            conn.execute("PRAGMA user_version=3")
 
     @contextmanager
     def connect(self):

@@ -50,7 +50,7 @@ class Intelligence:
         if provider == "codex":
             models = await asyncio.to_thread(self.runtime.models, uid)
         else:
-            credentials = self.openai_config(uid)
+            credentials = await asyncio.to_thread(self.openai_config, uid)
             try:
                 response = await self.request(credentials, "GET", "/models")
                 response.raise_for_status()
@@ -70,7 +70,7 @@ class Intelligence:
         placeholders = ",".join("?" for _ in selected)
         news = (
             self.db.all(
-                "SELECT n.id,n.title,n.content,n.source,n.url,n.topic,n.published_at,b.content AS article_content,"
+                "SELECT n.id,n.fingerprint,n.title,n.content,n.source,n.url,n.topic,n.published_at,b.content AS article_content,"
                 "b.source_url,b.fetched_at AS article_fetched_at FROM news n LEFT JOIN news_bodies b "
                 "ON b.news_id=n.id AND b.status='ready' WHERE n.user_id=? "
                 f"AND n.id IN ({placeholders})",
@@ -79,10 +79,22 @@ class Intelligence:
             if selected
             else []
         )
+        current = {
+            article["id"]: article
+            for article in news
+            if article["fingerprint"] == selected[article["id"]]["fingerprint"]
+        }
+        # News cleanup in another page must not replace a task's selected story with a reused row ID.
+        news = [
+            current.get(article_id)
+            or {**article, "article_content": None, "source_url": None, "article_fetched_at": None}
+            for article_id, article in selected.items()
+        ]
         news.sort(key=lambda article: selected[article["id"]]["relevance_score"], reverse=True)
         full_bodies = sum(bool(article.get("article_content")) for article in news)
         body_limit = min(6000, 30000 // max(1, full_bodies))
         for article in news:
+            article.pop("fingerprint", None)
             article["relevance_score"] = selected[article["id"]]["relevance_score"]
             article["related_entities"] = selected[article["id"]]["related_entities"]
             body = article.pop("article_content")
@@ -104,12 +116,12 @@ class Intelligence:
             "news_selection": selection["selection"],
         }
 
-    async def analyze(self, uid):
+    async def analyze(self, uid, *, settings=None, progress=None):
         lock = self.locks.setdefault(uid, asyncio.Lock())
         if lock.locked():
             raise ProviderError("analysis_running")
         async with lock:
-            settings = self.db.settings(uid)
+            settings = settings or self.db.settings(uid)
             provider, model, effort = (
                 settings["ai_provider"],
                 settings["ai_model"],
@@ -126,9 +138,11 @@ class Intelligence:
                 if effort != "auto" and effort not in chosen["efforts"]:
                     raise ProviderError("reasoning_not_supported")
             if provider == "openai":
-                self.openai_config(uid)
+                credentials = await asyncio.to_thread(self.openai_config, uid)
             selection = select_news(self.db, uid)
             if self.news:
+                if progress:
+                    progress("fetching_news")
                 await self.news.enrich_for_analysis(uid, selection["items"])
             evidence = self.evidence(uid, selection)
             if not evidence["news"] and not evidence["portfolio"]:
@@ -148,8 +162,9 @@ class Intelligence:
                 "execute commands, use tools, request credentials, or claim to have executed transactions."
             )
             payload = json.dumps(evidence, ensure_ascii=False)
+            if progress:
+                progress("generating")
             if provider == "openai":
-                credentials = self.openai_config(uid)
                 body = {
                     "model": model,
                     "messages": [{"role": "system", "content": system}, {"role": "user", "content": payload}],
@@ -158,7 +173,7 @@ class Intelligence:
                     body["reasoning_effort"] = effort
                 try:
                     response = await self.request(
-                        credentials, "POST", "/chat/completions", json=body, timeout=180
+                        credentials, "POST", "/chat/completions", json=body, timeout=None
                     )
                     if response.status_code in (400, 422):
                         raise ProviderError("model_or_reasoning_rejected")
@@ -167,7 +182,7 @@ class Intelligence:
                 except (httpx.HTTPError, ValueError, KeyError, IndexError):
                     raise ProviderError("ai_request_failed") from None
             else:
-                # User credentials and workspace are isolated; no inherited host config or MCP servers.
+                # Shared administrator credentials, per-user workspace, no inherited host config/MCP servers.
                 args = self.runtime.codex() + [
                     "exec",
                     "--ephemeral",
@@ -216,8 +231,8 @@ class Intelligence:
                 args += ["-c", "features.skip_host_skill_discovery=true"]
                 if effort != "auto":
                     args += ["-c", f'model_reasoning_effort="{effort}"']
-                code, stdout, stderr = await asyncio.to_thread(
-                    self.runtime.run, uid, args + ["-"], 240, system + "\n\n" + payload
+                code, stdout, stderr = await self.runtime.run_cancellable(
+                    uid, args + ["-"], system + "\n\n" + payload
                 )
                 if code:
                     raise ProviderError("codex_analysis_failed")

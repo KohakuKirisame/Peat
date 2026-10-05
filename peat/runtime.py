@@ -1,3 +1,4 @@
+import asyncio
 import codecs
 import json
 import os
@@ -39,10 +40,58 @@ def process_options():
 
 
 class Runtime:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, db=None):
         self.config = config
+        self.db = db
         self.jobs = {}
         self.lock = threading.Lock()
+
+    def _save_auth_home(self, relative):
+        self.config.data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        temporary = self.config.data_dir / f".codex-shared-{uuid.uuid4().hex}.tmp"
+        temporary.write_text(json.dumps({"home": relative}), encoding="utf-8")
+        temporary.replace(self.config.data_dir / "codex-shared.json")
+
+    def auth_home(self):
+        """One administrator-managed Codex identity; research workspaces remain per user."""
+        marker = self.config.data_dir / "codex-shared.json"
+        with self.lock:
+            if marker.exists():
+                try:
+                    relative = json.loads(marker.read_text(encoding="utf-8"))["home"]
+                except (ValueError, KeyError, TypeError):
+                    raise ProviderError("codex_shared_config_invalid") from None
+                if not isinstance(relative, str) or not re.fullmatch(r"shared/codex|users/[0-9]+/codex", relative):
+                    raise ProviderError("codex_shared_config_invalid")
+                path = (self.config.data_dir / relative).resolve()
+                if not path.is_relative_to(self.config.data_dir.resolve()):
+                    raise ProviderError("codex_shared_config_invalid")
+            else:
+                relative = "shared/codex"
+                path = self.config.data_dir / relative
+                # Adopt an existing administrator login once, without copying or returning its tokens.
+                if not (path / "auth.json").exists() and self.db:
+                    for administrator in self.db.all(
+                        "SELECT id FROM users WHERE role='admin' AND active=1 ORDER BY id"
+                    ):
+                        candidate = self.config.data_dir / "users" / str(administrator["id"]) / "codex"
+                        if (
+                            candidate.resolve().is_relative_to(self.config.data_dir.resolve())
+                            and (candidate / "auth.json").is_file()
+                        ):
+                            relative, path = f"users/{administrator['id']}/codex", candidate
+                            break
+                self._save_auth_home(relative)
+            path.mkdir(parents=True, exist_ok=True, mode=0o700)
+            return path
+
+    def select_shared_login(self):
+        with self.lock:
+            self._save_auth_home("shared/codex")
+
+    def clear_model_cache(self):
+        if self.db:
+            self.db.execute("DELETE FROM cache WHERE kind='models_codex'")
 
     def home(self, uid: int):
         path = self.config.data_dir / "users" / str(uid)
@@ -71,7 +120,7 @@ class Runtime:
             {
                 "HOME": str(home),
                 "USERPROFILE": str(home),
-                "CODEX_HOME": str(home / "codex"),
+                "CODEX_HOME": str(self.auth_home()),
                 "TMP": str(home / "tmp"),
                 "TEMP": str(home / "tmp"),
                 "TMPDIR": str(home / "tmp"),
@@ -104,7 +153,16 @@ class Runtime:
             return [executable]
         raise ProviderError("codex_not_installed")
 
-    def run(self, uid: int, args: list[str], timeout=20, input_text: str | None = None):
+    def run(
+        self,
+        uid: int,
+        args: list[str],
+        timeout=20,
+        input_text: str | None = None,
+        cancellation: threading.Event | None = None,
+    ):
+        if cancellation and cancellation.is_set():
+            raise ProviderError("analysis_cancelled")
         process = subprocess.Popen(
             args,
             cwd=self.home(uid) / "workspace",
@@ -117,18 +175,45 @@ class Runtime:
             errors="replace",
             **process_options(),
         )
+        finished = threading.Event()
+
+        def watch_cancellation():
+            while not finished.wait(0.1):
+                if cancellation.is_set():
+                    terminate(process)
+                    return
+
+        if cancellation:
+            threading.Thread(target=watch_cancellation, daemon=True).start()
         try:
             stdout, stderr = process.communicate(input_text, timeout=timeout)
         except subprocess.TimeoutExpired:
             terminate(process)
             process.communicate()
             raise ProviderError("process_timeout") from None
+        finally:
+            finished.set()
         return process.returncode, stdout, stderr
+
+    async def run_cancellable(self, uid: int, args: list[str], input_text: str):
+        cancellation = threading.Event()
+        worker = asyncio.create_task(asyncio.to_thread(self.run, uid, args, None, input_text, cancellation))
+        try:
+            return await asyncio.shield(worker)
+        except asyncio.CancelledError:
+            cancellation.set()
+            try:
+                await asyncio.shield(worker)
+            except (ProviderError, OSError):
+                pass
+            raise
 
     def start_job(self, uid: int, kind: str, args: list[str], timeout=120, on_success=None):
         with self.lock:
             if any(
-                (job["uid"] == uid or kind == "update") and job["kind"] == kind and job["status"] == "running"
+                (job["uid"] == uid or kind in {"update", "login"})
+                and job["kind"] == kind
+                and job["status"] == "running"
                 for job in self.jobs.values()
             ):
                 raise ProviderError("job_already_running")
@@ -207,11 +292,14 @@ class Runtime:
         return result
 
     def login(self, uid: int):
+        command = self.codex() + ["login", "--device-auth", "-c", 'cli_auth_credentials_store="file"']
+        self.select_shared_login()
         return self.start_job(
             uid,
             "login",
-            self.codex() + ["login", "--device-auth", "-c", 'cli_auth_credentials_store="file"'],
+            command,
             900,
+            self.clear_model_cache,
         )
 
     def login_status(self, uid: int):

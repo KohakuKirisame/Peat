@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from . import __version__
 from .ai import Intelligence
+from .analysis_jobs import AnalysisJobs
 from .brokers import BrokerService, ProviderError, import_statement, statement_summary
 from .charts import Charts, suggested_symbol
 from .config import Config
@@ -105,8 +106,9 @@ def create_app(config: Config | None = None):
         timeout=20, follow_redirects=False, headers={"User-Agent": "Peat/0.1 (+self-hosted research)"}
     )
     brokers, news, markets = BrokerService(db, vault, client), NewsService(db, client), Markets(db, client)
-    runtime, charts = Runtime(config), Charts(db, client)
+    runtime, charts = Runtime(config, db), Charts(db, client)
     ai = Intelligence(db, vault, client, runtime, config, news=news)
+    analysis_jobs = AnalysisJobs(db, ai)
     attempts = defaultdict(deque)
 
     async def scheduler():
@@ -139,6 +141,7 @@ def create_app(config: Config | None = None):
 
     @asynccontextmanager
     async def lifespan(app):
+        analysis_jobs.recover()
         task = asyncio.create_task(scheduler()) if config.background else None
         yield
         if task:
@@ -147,12 +150,14 @@ def create_app(config: Config | None = None):
                 await task
             except asyncio.CancelledError:
                 pass
+        await analysis_jobs.shutdown()
         runtime.shutdown()
         await client.aclose()
 
     app = FastAPI(title="Peat", version=__version__, lifespan=lifespan, docs_url=None, redoc_url=None)
     app.state.db, app.state.vault, app.state.brokers = db, vault, brokers
     app.state.client, app.state.ai, app.state.runtime, app.state.news = client, ai, runtime, news
+    app.state.analysis_jobs = analysis_jobs
     app.add_middleware(
         CORSMiddleware,
         allow_origins=config.origins,
@@ -477,8 +482,8 @@ def create_app(config: Config | None = None):
         return await news.sync(user["id"])
 
     @app.post("/api/news/{article_id}/fulltext")
-    async def news_fulltext(article_id: int, user=Depends(current_user)):
-        return await news.full_text(user["id"], article_id)
+    async def news_fulltext(article_id: int, refresh: bool = False, user=Depends(current_user)):
+        return await news.full_text(user["id"], article_id, refresh=refresh)
 
     @app.delete("/api/news")
     def clear_news(user=Depends(current_user)):
@@ -518,29 +523,50 @@ def create_app(config: Config | None = None):
             row["reasoning_effort"] = row["evidence"].get("reasoning_effort", "auto")
         return rows
 
-    @app.post("/api/ai/analyze")
+    @app.post("/api/ai/analyze", status_code=202)
     async def analyze(user=Depends(current_user)):
-        return await ai.analyze(user["id"])
+        return analysis_jobs.start(user["id"])
+
+    @app.get("/api/ai/jobs/current")
+    def current_analysis_job(user=Depends(current_user)):
+        return analysis_jobs.current(user["id"])
+
+    @app.get("/api/ai/jobs/{job_id}")
+    def analysis_job(job_id: str, user=Depends(current_user)):
+        return analysis_jobs.get(user["id"], job_id)
+
+    @app.post("/api/ai/jobs/{job_id}/cancel")
+    async def cancel_analysis_job(job_id: str, user=Depends(current_user)):
+        return analysis_jobs.cancel(user["id"], job_id)
 
     @app.post("/api/codex/login")
-    def codex_login(user=Depends(current_user)):
+    def codex_login(user=Depends(admin)):
         return {"job_id": runtime.login(user["id"])}
 
     @app.get("/api/codex/status")
     async def codex_status(user=Depends(current_user)):
         try:
-            return await asyncio.to_thread(runtime.login_status, user["id"])
+            return {
+                **await asyncio.to_thread(runtime.login_status, user["id"]),
+                "shared": True,
+                "can_manage": user["role"] == "admin",
+            }
         except ProviderError as exc:
-            return {"logged_in": False, "error": exc.code}
+            return {
+                "logged_in": False,
+                "error": exc.code,
+                "shared": True,
+                "can_manage": user["role"] == "admin",
+            }
 
     @app.post("/api/codex/logout")
-    async def codex_logout(user=Depends(current_user)):
-        if any(
-            job["uid"] == user["id"] and job["kind"] == "login" and job["status"] == "running"
-            for job in runtime.jobs.values()
-        ):
+    async def codex_logout(user=Depends(admin)):
+        if any(job["kind"] == "login" and job["status"] == "running" for job in runtime.jobs.values()):
             raise HTTPException(409, "login_in_progress")
-        await asyncio.to_thread(runtime.run, user["id"], runtime.codex() + ["logout"])
+        code, _, _ = await asyncio.to_thread(runtime.run, user["id"], runtime.codex() + ["logout"])
+        if code:
+            raise ProviderError("codex_logout_failed")
+        runtime.clear_model_cache()
         return {"ok": True}
 
     @app.get("/api/jobs/{job_id}")
