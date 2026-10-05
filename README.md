@@ -11,9 +11,10 @@ Self-hosted investment research with Trading 212, local news and configurable AI
 - Responsive desktop/mobile workspace, English/Chinese, a night-sky default theme, light/dark/system options and a custom accent color.
 - Username/password registration. The first account is the administrator; administrators can edit usernames, roles, activation and passwords.
 - Trading 212 Invest/Stocks ISA account value, current holding cost, cash, realized/unrealized P&L, positions, executions, dividends and cash movements. Live and demo environments are separate.
+- Pies appear as collapsed portfolio groups with securities value and P&L. Expand a Pie to inspect its holdings or open a constituent's candlestick chart. Search includes Pie names and constituent stocks.
 - Interactive OHLC candlesticks: 1/5/15 minutes, hourly, daily, weekly and monthly; selectable history ranges, candle hover values, volume and historical navigation. Per-user symbol mappings handle broker/quote-provider differences.
 - Exchange sessions with holiday/DST/lunch-break calendars; US 2Y/10Y/30Y Treasury yields, WTI/Brent, natural gas, gold, silver and platinum.
-- Company/industry RSS headlines and plain-text excerpts for holdings and a manual watchlist. Configurable count/age limits and manual clearing.
+- Company/industry RSS headlines, excerpts and expandable article bodies for holdings and a manual watchlist. Configurable count/age limits and manual clearing.
 - OpenAI-compatible Chat Completions and locally installed Codex CLI. Model discovery, manual API model IDs and user-selected reasoning effort. Codex effort choices come from its model catalog.
 - Five investment styles, shared and per-style editable prompts, reset-to-default controls and analysis archives containing the exact evidence, prompts, model and effort used.
 - Browser device-code login for Codex with isolated login directories per Peat user. Admin-only local console and versioned Codex/calendar dependency updates.
@@ -73,7 +74,7 @@ For subsequent launches, activate the virtual environment and run `python -m pea
 ## First setup
 
 1. **Account:** Register a username (3–32 letters/digits/`_.-`) and password (10–128 characters). The first account becomes administrator. Set `PEAT_REGISTRATION_OPEN=false` after creating your intended accounts if desired.
-2. **Trading 212:** In Settings, enter API Key + API Secret with account, portfolio and history read permissions. Choose the correct live/demo environment. Open Overview and sync. The API applies to Invest and Stocks ISA accounts.
+2. **Trading 212:** In Settings, enter API Key + API Secret with account, portfolio, history and `pies:read` permissions. Choose the correct live/demo environment. Open Overview and sync. The API applies to Invest and Stocks ISA accounts.
 3. **History:** Activity → Sync history imports one provider page at a time; Load older history continues the cursor. The interface reports whether all provider pages have been read. Import English-column Trading 212 CSV statements to summarize deposits, withdrawals, dividends and stated realized P&L by currency.
 4. **News:** Add companies and industry names to Watchlist, then Collect news. Google News RSS requires no API registration. Retention settings remove the oldest saved items.
 5. **AI API:** Save a base URL including `/v1` and a key. For local servers, explicitly list their hostnames in `PEAT_LLM_ALLOWED_HOSTS`, e.g. `localhost,127.0.0.1,host.docker.internal`. The base URL must point to a trusted endpoint.
@@ -84,9 +85,15 @@ For subsequent launches, activate the virtual environment and run `python -m pea
 
 Portfolio **invested capital** means the cost of currently open positions, not lifetime deposits. Account totals use the broker's account currency; each quote retains its instrument currency. CSV results are grouped by currency and cover only imported rows. They are not added to broker totals. Account-value charts contain locally collected snapshots and include external cash flows.
 
+Pie details are refreshed every five minutes, with detail requests spaced to respect Trading 212's rate limits. Pie value/P&L come from the Pie API in account currency; Pie cash is displayed in account funds, outside the holdings table. The original account totals stay unchanged. A stock held across multiple Pies and outside Pies is split by its actual quantities. The outside portion's market value is quantity-proportional; its P&L is left unavailable when its separate cost basis is absent. If quantities do not reconcile, Peat shows the original individual holdings until the next matching Pie snapshot. Permission/API failures keep holdings visible. Trading 212 currently documents its Pie API as operational but deprecated.
+
 Trading 212 is polled at the configured interval (default 60 seconds), subject to provider limits. Public Yahoo quotes/candles can be delayed or unavailable; candles use provider OHLC rather than a reconstructed total-return series. Confirm the instrument, exchange and currency when setting a symbol. Treasury rates are published daily. Every dataset carries source/time information, and failed quote refreshes mark retained values stale. Exchange calendars describe scheduled regular sessions and cannot report unplanned halts.
 
-RSS provides publisher headlines/excerpts rather than guaranteed full articles. Up to 30 company/industry queries are fetched per cycle. No paid news account is required. AI briefs preserve their evidence and prompts as generated; updating or clearing live news does not rewrite previous briefs.
+News cards expand to fetch and cache the readable publisher article, including Google News link resolution. Successful bodies are kept with their source URL and timestamp and removed with the news retention policy. Pages that require a subscription or cannot be retrieved keep an original-article link. Up to 30 company/industry queries are fetched per cycle; no paid news account is required.
+
+Research ranks cached news by held companies, position weights, watchlist companies, industry terms and recency, then balances coverage and sources and removes repeated headlines. Up to 30 relevant stories enter a brief. Body retrieval runs for that selected set with a bounded time budget; text budgets are shared across the retrieved bodies. The evidence panel records the associated companies/industries and whether article text or an RSS excerpt was used.
+
+Cash and interest-bearing deposits remain account funds. They are excluded from research inputs, position weights, concentration analysis and suggested funding. Research weights and reference amounts use invested securities market value. The five editable default prompts request concrete OPEN/ADD/REDUCE/CLOSE/HOLD/WATCH recommendations, target weights, staged sizes and triggers, in concise Markdown. Headings, emphasis, lists and GFM tables render directly in archived and new briefs. Historical brief content remains unchanged; generate a new brief to use the new research rules.
 
 ## Development and validation
 

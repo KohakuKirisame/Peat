@@ -1,17 +1,14 @@
-Peat 0.1.1 introduces a self-hosted investment research workspace.
+Peat 0.2.0 improves portfolio grouping and research quality.
 
-- Trading 212 portfolio, history and CSV statements.
-- Multi-timeframe candlesticks, Treasury yields, commodities and exchange sessions.
-- Local RSS news with retention controls.
-- OpenAI-compatible APIs and per-user Codex device login.
-- Selectable models and reasoning effort, five editable investment-style prompts and archived evidence.
-- English/Chinese, responsive layout, light/dark/system themes and custom accents.
-- Admin users, local command console, encrypted credentials and dependency version controls.
+- Trading 212 Pies are grouped with expand/collapse controls, constituent charts and quantity-aware outside-Pie holdings.
+- Research briefs render Markdown headings, emphasis, lists and tables, including archived briefs.
+- News cards fetch and cache expandable publisher article bodies. Retention clears their cached text as well.
+- Research selects news by held companies, security weights, watchlist and industry relevance, with coverage, recency and duplicate controls.
+- Cash and interest-bearing deposits remain in account funds and are excluded from research context and portfolio allocation analysis.
+- Revised bilingual prompts request concrete OPEN/ADD/REDUCE/CLOSE/HOLD/WATCH actions, target weights and triggers with concise wording.
 
-Run with `docker compose up -d` using the attached Compose file, or build from source using the build override. Persistent data is stored in `peat-data`.
+Peat 0.2.0 新增 Pie 合并与展开、简报 Markdown 渲染、新闻正文缓存和基于持仓/行业相关性的选材。现金与计息 deposit 仅作为账户资金显示。新提示词给出明确的开仓、增持、减持、平仓等操作、目标仓位与触发条件，减少反复声明。
 
-Peat 0.1.1 提供持仓、K 线、宏观行情、本地新闻和可配置 AI 研究。支持中英文、自定义主题、管理员控制台、模型及思考强度选择，以及五档可编辑提示词。
+Existing data volumes are retained. The article-body table is created automatically on startup. Existing reports render as Markdown; generate a new brief to use the updated research rules. Pie grouping requires Trading 212 `pies:read` permission.
 
-Image: `ghcr.io/kohakukirisame/peat:0.1.1` (`linux/amd64`, `linux/arm64`). See the bilingual README for setup and data semantics.
-
-This patch also validates the HTTP host before account bootstrap and administrative routes.
+Image: `ghcr.io/kohakukirisame/peat:0.2.0` (`linux/amd64`, `linux/arm64`).

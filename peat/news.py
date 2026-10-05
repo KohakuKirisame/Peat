@@ -9,7 +9,9 @@ from urllib.parse import urlencode, urlparse
 
 import feedparser
 import httpx
+from fastapi import HTTPException
 
+from .articles import ArticleReader
 from .brokers import ProviderError
 from .db import Database, now
 from .security import digest
@@ -46,16 +48,84 @@ class NewsService:
     def __init__(self, db: Database, client: httpx.AsyncClient):
         self.db, self.client = db, client
         self.locks, self.cooldowns = {}, {}
+        self.reader = ArticleReader()
+        self.body_locks = {}
+        self.body_slots = asyncio.Semaphore(3)
+
+    async def full_text(self, uid: int, article_id: int):
+        article = self.db.one("SELECT * FROM news WHERE id=? AND user_id=?", (article_id, uid))
+        if not article:
+            raise HTTPException(404, "news_not_found")
+        async with self.body_locks.setdefault(article_id, asyncio.Lock()):
+            if not self.db.one(
+                "SELECT id FROM news WHERE id=? AND user_id=? AND fingerprint=?",
+                (article_id, uid, article["fingerprint"]),
+            ):
+                raise HTTPException(404, "news_not_found")
+            cached = self.db.one("SELECT * FROM news_bodies WHERE news_id=?", (article_id,))
+            if cached and (
+                cached["status"] == "ready"
+                or (datetime.now(timezone.utc) - datetime.fromisoformat(cached["fetched_at"])).total_seconds()
+                < 300
+            ):
+                return cached
+            result = {
+                "news_id": article_id,
+                "content": "",
+                "source_url": article["url"],
+                "fetched_at": now(),
+                "status": "unavailable",
+                "error": None,
+                "truncated": False,
+            }
+            try:
+                async with self.body_slots:
+                    async with asyncio.timeout(25):
+                        extracted = await self.reader.read(article["url"])
+                result.update(extracted, status="ready", fetched_at=now())
+            except (ProviderError, TimeoutError) as exc:
+                result["error"] = exc.code if isinstance(exc, ProviderError) else "article_timeout"
+            # A retention cleanup may have removed/replaced this ID during the request.
+            self.db.execute(
+                "INSERT INTO news_bodies(news_id,content,source_url,fetched_at,status,error,truncated) "
+                "SELECT id,?,?,?,?,?,? FROM news WHERE id=? AND user_id=? AND fingerprint=? "
+                "ON CONFLICT(news_id) DO UPDATE SET content=excluded.content,source_url=excluded.source_url,"
+                "fetched_at=excluded.fetched_at,status=excluded.status,error=excluded.error,truncated=excluded.truncated",
+                (
+                    result["content"],
+                    result["source_url"],
+                    result["fetched_at"],
+                    result["status"],
+                    result["error"],
+                    result["truncated"],
+                    article_id,
+                    uid,
+                    article["fingerprint"],
+                ),
+            )
+            return result
+
+    async def enrich_for_analysis(self, uid: int, articles: list[dict]):
+        # Candidates have already been selected for holdings/industry relevance, not timestamp order.
+        # Reuse cached bodies and bound total acquisition time while retaining every selected excerpt.
+        try:
+            async with asyncio.timeout(45):
+                await asyncio.gather(
+                    *(self.full_text(uid, article["id"]) for article in articles), return_exceptions=True
+                )
+        except TimeoutError:
+            pass
 
     def topics(self, uid: int):
         watchlist = self.db.all("SELECT name,sector FROM watchlist WHERE user_id=?", (uid,))
         portfolio = self.db.cached(uid, "portfolio")
         holdings = (portfolio or {}).get("data", {}).get("positions", [])
+        holdings = sorted(holdings, key=lambda position: position.get("value") or 0, reverse=True)
         names = [p["name"] or p["ticker"].split("_")[0] for p in holdings]
         names += [item["name"] for item in watchlist]
         sectors = [item["sector"] for item in watchlist if item["sector"]]
-        industry_queries = [f"{name} industry" for name in names]
-        return list(dict.fromkeys(names + sectors + industry_queries))[:30] or ["financial markets"]
+        company_queries = [query for name in names for query in (name, f"{name} industry")]
+        return list(dict.fromkeys(sectors + company_queries))[:30] or ["financial markets"]
 
     def prune(self, uid: int):
         settings = self.db.settings(uid)

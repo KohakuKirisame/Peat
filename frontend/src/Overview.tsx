@@ -34,6 +34,8 @@ import {
   Tag,
 } from "./ui";
 import { PriceChart } from "./Chart";
+import { HoldingsTable } from "./HoldingsTable";
+import { NewsArticle } from "./NewsArticle";
 
 export function MarketsPanel({ full = false }: { full?: boolean }) {
   const { t, user } = useApp();
@@ -324,16 +326,28 @@ export function Overview({
             {t("Updated", "更新于")} {date(p.as_of, user.settings.language)}
           </span>
           <span>
-            {t("Available cash", "可用现金")}{" "}
+            {t("Cash / deposit", "现金 / Deposit")}{" "}
             {money(p.cash, currency, user.settings.language)}
           </span>
+          {p.cash_in_pies > 0 && (
+            <span>
+              {t("Cash in pies", "Pie 内现金")}{" "}
+              {money(p.cash_in_pies, currency, user.settings.language)}
+            </span>
+          )}
+          {p.cash_reserved > 0 && (
+            <span>
+              {t("Reserved funds", "预留资金")}{" "}
+              {money(p.cash_reserved, currency, user.settings.language)}
+            </span>
+          )}
         </div>
       )}
       <div className={portfolioOnly ? "portfolio-layout" : "dashboard-layout"}>
         <div className="main-column">
           <Panel
             title={t("Your holdings", "当前持仓")}
-            sub={`${positions.length} ${t("assets in your portfolio", "项持仓")}`}
+            sub={`${positions.length} ${t("assets in your portfolio", "项持仓")}${p?.pies?.length ? ` · ${p.pies.length} Pies` : ""}`}
             action={
               <input
                 className="compact-search"
@@ -344,86 +358,12 @@ export function Overview({
               />
             }
           >
-            {positions.length ? (
-              <div className="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>{t("Asset", "资产")}</th>
-                      <th>{t("Price", "现价")}</th>
-                      <th>{t("Value", "市值")}</th>
-                      <th>{t("Return", "收益")}</th>
-                      <th>{t("Weight", "占比")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {positions
-                      .filter((h: any) =>
-                        (h.name + h.ticker)
-                          .toLowerCase()
-                          .includes(filter.toLowerCase()),
-                      )
-                      .map((h: any, i: number) => (
-                        <tr
-                          key={h.ticker}
-                          onClick={() => setSelected(h)}
-                          className="clickable"
-                        >
-                          <td>
-                            <button
-                              className="holding-name"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelected(h);
-                              }}
-                            >
-                              <span className={`asset-avatar color-${i % 5}`}>
-                                {h.ticker.split("_")[0].slice(0, 2)}
-                              </span>
-                              <span>
-                                <strong>{h.name || h.ticker}</strong>
-                                <small>
-                                  {h.ticker.split("_")[0]} ·{" "}
-                                  {num(h.quantity, 6)} {t("shares", "股")}
-                                </small>
-                              </span>
-                            </button>
-                          </td>
-                          <td>
-                            {money(h.price, h.currency, user.settings.language)}
-                            <small>{h.currency}</small>
-                          </td>
-                          <td>
-                            {money(
-                              h.value,
-                              h.account_currency || currency,
-                              user.settings.language,
-                            )}
-                          </td>
-                          <td className={h.pnl >= 0 ? "positive" : "negative"}>
-                            {money(
-                              h.pnl,
-                              h.account_currency || currency,
-                              user.settings.language,
-                            )}
-                          </td>
-                          <td>
-                            {p.market_value && h.value != null
-                              ? num((h.value / p.market_value) * 100, 1) + "%"
-                              : "—"}
-                            <div className="weight-bar">
-                              <i
-                                style={{
-                                  width: `${p.market_value ? Math.min(100, Math.max(0, (h.value / p.market_value) * 100)) : 0}%`,
-                                }}
-                              />
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
+            {positions.length || p?.pies?.length ? (
+              <HoldingsTable
+                portfolio={p}
+                filter={filter}
+                onSelect={setSelected}
+              />
             ) : (
               <Empty
                 icon={<Wallet size={24} />}
@@ -506,17 +446,7 @@ export function Overview({
               {news.data?.items?.length ? (
                 <div className="news-preview">
                   {news.data.items.slice(0, 3).map((n: any) => (
-                    <article key={n.id}>
-                      <div className="article-meta">
-                        {n.source}
-                        <span>·</span>
-                        {date(n.published_at, user.settings.language)}
-                      </div>
-                      <h3>
-                        <External href={n.url}>{n.title}</External>
-                      </h3>
-                      <p>{n.content}</p>
-                    </article>
+                    <NewsArticle key={n.id} article={n} compact />
                   ))}
                 </div>
               ) : (

@@ -2938,3 +2938,288 @@ html[data-theme="dark"] .peat-topography {
 .peat-topography div:nth-child(5) {
   background: radial-gradient(ellipse, #4e65b536, transparent 70%);
 }
+
+/* Collapsible broker Pie groups retain the same portfolio table on mobile. */
+.holdings-notice {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  color: var(--subtle);
+  background: var(--surface-alt);
+  font-size: 10px;
+  line-height: 1.8;
+}
+.holdings-table .pie-header {
+  background: var(--tint);
+}
+.holdings-table .pie-header td {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.pie-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 3px 0;
+  text-align: left;
+  min-height: 44px;
+  width: 100%;
+}
+.pie-toggle > svg {
+  color: var(--accent-ink);
+}
+.pie-avatar {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  color: var(--accent-ink);
+}
+.pie-label strong {
+  display: block;
+  max-width: 180px;
+  white-space: normal;
+  line-height: 1.6;
+}
+.pie-label small {
+  font-size: 9px;
+}
+.pie-cash > span {
+  font-size: 9px;
+  color: var(--muted);
+}
+.pie-cash > small {
+  color: var(--subtle);
+  font-variant-numeric: tabular-nums;
+}
+.holdings-table .pie-child td:first-child {
+  padding-left: 41px;
+}
+.holdings-table .pie-child .holding-name {
+  position: relative;
+}
+.holdings-table .pie-child .holding-name::before {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 8px;
+  width: 7px;
+  height: 13px;
+  border-left: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0 0 0 3px;
+}
+.holdings-table .pie-detail-meta td,
+.holdings-table .holdings-section td {
+  padding: 10px 18px;
+  font-size: 9px;
+  color: var(--muted);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+.holdings-table .pie-detail-meta td {
+  white-space: normal;
+  line-height: 1.7;
+}
+.holdings-table .holdings-section td {
+  letter-spacing: 0.2px;
+  border-top: 1px solid var(--border);
+}
+.holdings-table .pie-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+}
+.holdings-table tbody[hidden] {
+  display: none;
+}
+@media (max-width: 760px) {
+  .pie-toggle {
+    gap: 7px;
+  }
+  .pie-label strong {
+    max-width: 140px;
+  }
+  .holdings-table .pie-child td:first-child {
+    padding-left: 30px;
+  }
+}
+
+.brief-content {
+  white-space: normal;
+}
+.markdown-body {
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.markdown-body > :first-child {
+  margin-top: 0;
+}
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  margin: 1.6em 0 0.7em;
+  line-height: 1.55;
+  color: var(--text);
+}
+.markdown-body h1 {
+  font-size: 22px;
+}
+.markdown-body h2 {
+  font-size: 18px;
+}
+.markdown-body h3 {
+  font-size: 15px;
+}
+.markdown-body h4 {
+  font-size: 14px;
+}
+.markdown-body p {
+  margin: 0.8em 0;
+}
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.6em;
+  margin: 0.8em 0;
+}
+.markdown-body li {
+  margin: 0.4em 0;
+}
+.markdown-body li > p {
+  margin: 0.35em 0;
+}
+.markdown-body strong {
+  font-weight: 700;
+  color: var(--text);
+}
+.markdown-body a {
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.markdown-body blockquote {
+  border-left: 3px solid var(--accent);
+  margin: 1em 0;
+  padding: 0.2em 1em;
+  background: var(--tint);
+  color: var(--subtle);
+}
+.markdown-body code {
+  font-size: 0.9em;
+  background: var(--tint);
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+.markdown-body pre {
+  white-space: pre;
+  overflow-x: auto;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-alt);
+}
+.markdown-body pre code {
+  padding: 0;
+  background: none;
+}
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.6em 0;
+}
+.markdown-table {
+  overflow-x: auto;
+  max-width: 100%;
+  margin: 1.1em 0;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+.markdown-table table {
+  white-space: normal;
+  min-width: 460px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.markdown-table th,
+.markdown-table td {
+  padding: 11px 13px;
+  vertical-align: top;
+  min-width: 85px;
+}
+.markdown-table th {
+  font-size: 11px;
+  font-weight: 650;
+}
+.markdown-table tr:last-child td {
+  border-bottom: 0;
+}
+.article-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 13px;
+}
+.article-controls .article-id {
+  margin: 0;
+}
+.article-expanded {
+  margin-top: 14px;
+  padding: 17px 18px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.95;
+  color: var(--subtle);
+}
+.article-fulltext {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  max-height: 65vh;
+  overflow-y: auto;
+  padding-right: 7px;
+  scrollbar-width: thin;
+}
+.article-expanded .source-line {
+  padding: 15px 0 0;
+}
+.article-expanded .field-hint {
+  margin-top: 10px;
+}
+.news-preview .article-expanded p {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+.pie-label .pie-updated {
+  font-size: 8px;
+  white-space: normal;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 175px;
+}
+@media (max-width: 760px) {
+  .brief-content {
+    padding: 19px;
+    font-size: 13px;
+  }
+  .markdown-body h2 {
+    font-size: 16px;
+  }
+  .article-expanded {
+    padding: 14px;
+  }
+  .markdown-table table {
+    font-size: 11px;
+  }
+}
+
+.evidence-related {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.search-box button {
+  white-space: nowrap;
+  flex-shrink: 0;
+}

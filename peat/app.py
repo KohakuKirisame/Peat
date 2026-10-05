@@ -106,7 +106,7 @@ def create_app(config: Config | None = None):
     )
     brokers, news, markets = BrokerService(db, vault, client), NewsService(db, client), Markets(db, client)
     runtime, charts = Runtime(config), Charts(db, client)
-    ai = Intelligence(db, vault, client, runtime, config)
+    ai = Intelligence(db, vault, client, runtime, config, news=news)
     attempts = defaultdict(deque)
 
     async def scheduler():
@@ -350,6 +350,7 @@ def create_app(config: Config | None = None):
                 }
             vault.set(user["id"], provider, value)
             brokers.next_attempt.pop((user["id"], "portfolio"), None)
+            brokers.next_attempt.pop((user["id"], "pies"), None)
             return {"ok": True}
 
     @app.delete("/api/connections/{provider}")
@@ -370,7 +371,9 @@ def create_app(config: Config | None = None):
                 row["ticker"]: row["symbol"]
                 for row in db.all("SELECT * FROM symbol_mappings WHERE user_id=?", (uid,))
             }
-            for position in cached["data"]["positions"]:
+            views = [cached["data"]["positions"], cached["data"].get("ungrouped_positions", [])]
+            views.extend(pie["positions"] for pie in cached["data"].get("pies", []))
+            for position in [position for view in views for position in view]:
                 position["chart_symbol"] = mappings.get(
                     position["ticker"], suggested_symbol(position["ticker"])
                 )
@@ -472,6 +475,10 @@ def create_app(config: Config | None = None):
     @app.post("/api/news/sync")
     async def sync_news(user=Depends(current_user)):
         return await news.sync(user["id"])
+
+    @app.post("/api/news/{article_id}/fulltext")
+    async def news_fulltext(article_id: int, user=Depends(current_user)):
+        return await news.full_text(user["id"], article_id)
 
     @app.delete("/api/news")
     def clear_news(user=Depends(current_user)):

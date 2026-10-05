@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Markdown } from "./Markdown";
 import {
   ArrowUpRight,
   BookOpenText,
@@ -408,7 +409,9 @@ export default function Intelligence() {
                       {date(analysis.created_at, user.settings.language)}
                     </span>
                   </div>
-                  <div className="brief-content">{analysis.content}</div>
+                  <div className="brief-content">
+                    <Markdown content={analysis.content} />
+                  </div>
                   <button
                     className="text-button evidence-toggle"
                     onClick={() => setEvidenceOpen(!evidenceOpen)}
@@ -433,10 +436,37 @@ export default function Intelligence() {
                           user.settings.language,
                         )}
                       </p>
+                      {analysis.evidence?.news_selection && (
+                        <p>
+                          {t(
+                            "Relevant stories selected",
+                            "按持仓与行业筛选新闻",
+                          )}{" "}
+                          · {analysis.evidence.news_selection.selected_count}
+                          {" / "}
+                          {analysis.evidence.news_selection.candidate_count}
+                        </p>
+                      )}
                       {analysis.evidence?.news?.map((n: any) => (
                         <p key={n.id}>
                           <span>[news {n.id}] </span>
                           <External href={n.url}>{n.title}</External>
+                          {n.related_entities?.length > 0 && (
+                            <small className="evidence-related">
+                              {t("Related to", "关联")} ·{" "}
+                              {Array.from(
+                                new Set(
+                                  n.related_entities.map(
+                                    (entity: any) => entity.name,
+                                  ),
+                                ),
+                              ).join(" · ")}
+                              {" · "}
+                              {n.content_kind === "rss_excerpt"
+                                ? t("RSS excerpt", "RSS 摘要")
+                                : t("Article text", "新闻正文")}
+                            </small>
+                          )}
                         </p>
                       ))}
                       <details>

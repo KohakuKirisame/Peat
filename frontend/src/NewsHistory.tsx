@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { NewsArticle } from "./NewsArticle";
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -125,31 +126,14 @@ export function News() {
               : t("Latest developments", "最新动态")
           }
           sub={t(
-            "Plain-text RSS headlines and excerpts · original sources linked",
-            "纯文字 RSS 标题与摘要 · 附原始来源",
+            "Headlines and excerpts · expand an article to read the saved body",
+            "标题与摘要 · 展开查看本地保存的正文",
           )}
         >
           {r.data?.items?.length ? (
             <div className="news-feed">
               {r.data.items.map((n: any) => (
-                <article key={n.id}>
-                  <div className="article-meta">
-                    <Tag>{n.topic}</Tag>
-                    <span>{n.source}</span>
-                    <span>·</span>
-                    <time>
-                      {date(
-                        n.published_at || n.fetched_at,
-                        user.settings.language,
-                      )}
-                    </time>
-                  </div>
-                  <h2>
-                    <External href={n.url}>{n.title}</External>
-                  </h2>
-                  <p>{n.content}</p>
-                  <div className="article-id">[news {n.id}]</div>
-                </article>
+                <NewsArticle key={n.id} article={n} />
               ))}
             </div>
           ) : (

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "peat-invest"
-version = "0.1.1"
+version = "0.2.0"
 description = "Self-hosted investment intelligence with Trading 212, local news and AI"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -14,7 +14,7 @@ dependencies = [
   "fastapi>=0.115,<1", "uvicorn[standard]>=0.34,<1", "httpx>=0.28,<1",
   "argon2-cffi>=23.1,<26", "cryptography>=44,<48", "feedparser>=6,<7",
   "exchange-calendars>=4.8,<5", "python-multipart>=0.0.20,<1", "defusedxml>=0.7,<1",
-  "python-dotenv>=1,<2"
+  "python-dotenv>=1,<2", "trafilatura>=2.1,<3"
 ]
 
 [project.optional-dependencies]

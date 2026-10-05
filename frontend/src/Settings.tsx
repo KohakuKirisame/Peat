@@ -216,8 +216,8 @@ export default function Settings() {
                 </div>
                 <p className="field-hint">
                   {t(
-                    "Create an API key with account, portfolio and history read permissions. Switching credentials clears cached account data.",
-                    "请使用账户、持仓及历史读取权限的 API Key。更换账户凭据会清除原账户的本地缓存。",
+                    "Create an API key with account, portfolio, history and pies:read permissions. Switching credentials clears cached account data.",
+                    "请使用账户、持仓、历史及 pies:read 读取权限的 API Key。更换账户凭据会清除原账户的本地缓存。",
                   )}
                 </p>
                 <div className="settings-actions">

@@ -64,6 +64,11 @@ CREATE TABLE IF NOT EXISTS news (
  UNIQUE(user_id,fingerprint)
 );
 CREATE INDEX IF NOT EXISTS news_user_date ON news(user_id,published_at DESC);
+CREATE TABLE IF NOT EXISTS news_bodies (
+ news_id INTEGER PRIMARY KEY REFERENCES news(id) ON DELETE CASCADE,
+ content TEXT NOT NULL DEFAULT '', source_url TEXT NOT NULL, fetched_at TEXT NOT NULL,
+ status TEXT NOT NULL, error TEXT, truncated INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS analyses (
  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  provider TEXT NOT NULL, model TEXT NOT NULL, style TEXT NOT NULL, content TEXT NOT NULL,
@@ -87,7 +92,7 @@ class Database:
         with self.connect() as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.executescript(SCHEMA)
-            conn.execute("PRAGMA user_version=1")
+            conn.execute("PRAGMA user_version=2")
 
     @contextmanager
     def connect(self):
