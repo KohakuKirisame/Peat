@@ -1,0 +1,25 @@
+services:
+  peat:
+    image: ghcr.io/kohakukirisame/peat:latest
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      PEAT_DATA_DIR: /data
+      PEAT_SECURE_COOKIES: ${PEAT_SECURE_COOKIES:-false}
+      PEAT_REGISTRATION_OPEN: ${PEAT_REGISTRATION_OPEN:-true}
+      PEAT_CONSOLE_ENABLED: ${PEAT_CONSOLE_ENABLED:-true}
+      PEAT_ORIGINS: ${PEAT_ORIGINS:-http://localhost:8787,http://127.0.0.1:8787}
+      PEAT_LLM_ALLOWED_HOSTS: ${PEAT_LLM_ALLOWED_HOSTS:-}
+    volumes:
+      - peat-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    init: false
+    restart: unless-stopped
+volumes:
+  peat-data:

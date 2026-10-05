@@ -1,0 +1,7 @@
+services:
+  peat:
+    image: peat:local
+    build:
+      context: .
+      args:
+        CODEX_VERSION: "0.155.1"

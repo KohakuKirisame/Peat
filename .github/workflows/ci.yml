@@ -1,0 +1,43 @@
+name: Test
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: pip install --require-hashes -r requirements.lock
+      - run: pip install pytest pytest-asyncio ruff
+      - run: ruff check peat tests
+      - run: python -m pytest -q
+      - run: python scripts/check_secrets.py
+      - working-directory: frontend
+        run: npm ci && npm run build
+      - working-directory: frontend
+        run: npx playwright install --with-deps chromium && npm run test:e2e
+      - name: Validate container build
+        run: docker build -t peat:ci .
+      - name: Smoke-test container
+        run: |
+          docker run -d --name peat-ci -p 8787:8787 peat:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8787/api/health; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8787/api/auth/setup
+          docker exec peat-ci node /opt/peat-runtime/node_modules/@openai/codex/bin/codex.js --version
+      - name: Cleanup
+        if: always()
+        run: docker rm -f peat-ci || true
