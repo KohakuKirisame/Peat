@@ -61,6 +61,7 @@ async def test_codex_receives_selected_horizon_and_archives_the_resolved_prompt(
     app = create_app(Config(data_dir=tmp_path, background=False))
     settings = DEFAULT_SETTINGS | {
         "ai_provider": "codex",
+        "ai_live_data": False,
         "ai_model": "fixture-model",
         "holding_horizon": "short",
         "ai_horizon_prompts": {"short": "CUSTOM SHORT PLAN"},

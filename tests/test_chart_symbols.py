@@ -40,7 +40,7 @@ def test_exchange_metadata_distinguishes_nordic_nasdaq_and_us_nasdaq():
 def test_chart_route_resolves_airbus_unknown_ids_and_respects_user_mapping(tmp_path, monkeypatch):
     seen = []
 
-    async def fetch(self, symbol, interval, period):
+    async def fetch(self, symbol, interval, period, **kwargs):
         seen.append((symbol, interval, period))
         return {"data": {"symbol": symbol, "candles": []}}
 

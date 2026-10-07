@@ -27,6 +27,7 @@ import {
 } from "./api";
 import type { Settings as Preferences } from "./api";
 import { Button, External, Loading, Panel, ResourceError, Tag } from "./ui";
+import { ReportStorage } from "./ReportStorage";
 
 function InterfaceScale() {
   const { t, uiScale, setUiScale } = useApp();
@@ -571,6 +572,7 @@ export default function Settings() {
               </label>
             </div>
           </Panel>
+          <ReportStorage />
           <Panel title={t("Data & refresh", "数据与刷新")}>
             <form
               className="preferences"

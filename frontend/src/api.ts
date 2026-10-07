@@ -12,6 +12,10 @@ export type Settings = {
   language: "en" | "zh";
   style: string;
   holding_horizon: "ultra_short" | "short" | "medium_long";
+  analysis_limit: number;
+  ai_live_data: boolean;
+  ai_web_search: boolean;
+  ai_market_tools: boolean;
   news_limit: number;
   news_days: number;
   news_interval: number;
@@ -82,6 +86,18 @@ export const put = <T = any>(path: string, body: unknown) =>
 export const del = (path: string) => api(path, { method: "DELETE" });
 
 const errors: Record<string, [string, string]> = {
+  report_in_use: [
+    "Stop this report's active reply before deleting it.",
+    "请先中止这份报告正在生成的回复，再删除报告。",
+  ],
+  research_tool_limit: [
+    "The research tool limit was reached. Narrow the question and retry.",
+    "本次查询次数已达上限，请缩小问题范围后重试。",
+  ],
+  invalid_chart_window: [
+    "Use a valid dated price window with a timezone.",
+    "请使用含时区的有效行情时间区间。",
+  ],
   question_required: ["Enter a follow-up question.", "请输入追问内容。"],
   analysis_not_found: [
     "This research brief is unavailable.",

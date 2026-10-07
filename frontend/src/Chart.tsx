@@ -10,6 +10,8 @@ type Candle = {
   low: number;
   close: number;
   volume: number;
+  session?: string;
+  complete?: boolean;
 };
 type ChartData = {
   data: {
@@ -21,6 +23,8 @@ type ChartData = {
     status: string;
     as_of: string;
     candles: Candle[];
+    extended_supported?: boolean;
+    has_extended?: boolean;
   };
 };
 const ranges: Record<string, string[]> = {
@@ -47,9 +51,11 @@ export function PriceChart({
     [hover, setHover] = useState<number | null>(null),
     [end, setEnd] = useState(0),
     [count, setCount] = useState(80);
+  const [extended, setExtended] = useState(true);
+  const intraday = ["1m", "5m", "15m", "1h"].includes(interval);
   const request = useResource<ChartData>(
     symbol
-      ? `/charts?symbol=${encodeURIComponent(symbol)}&interval=${interval}&period=${period}`
+      ? `/charts?symbol=${encodeURIComponent(symbol)}&interval=${interval}&period=${period}&extended=${extended && intraday}`
       : null,
     0,
     false,
@@ -132,6 +138,30 @@ export function PriceChart({
           ))}
         </select>
       </div>
+      <div className="chart-sessions">
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={extended}
+            disabled={!intraday || data?.extended_supported === false}
+            onChange={(event) => setExtended(event.target.checked)}
+          />
+          {t("US pre/post market", "美股盘前／盘后")}
+        </label>
+        {!intraday && (
+          <span>
+            {t("Available on minute/hour charts", "适用于分钟／小时 K 线")}
+          </span>
+        )}
+        {data?.has_extended && (
+          <span className="session-legend">
+            <i className="pre" />
+            {t("Pre-market", "盘前")}
+            <i className="post" />
+            {t("After-hours", "盘后")}
+          </span>
+        )}
+      </div>
       <form
         className="symbol-form"
         onSubmit={(e) => {
@@ -181,6 +211,20 @@ export function PriceChart({
         <>
           <div className="ohlc">
             <span>{selected && label(selected.time)}</span>
+            {intraday && selected?.session && (
+              <span className={`session-label ${selected.session}`}>
+                {
+                  (
+                    {
+                      pre: t("Pre-market", "盘前"),
+                      regular: t("Regular session", "常规时段"),
+                      post: t("After-hours", "盘后"),
+                      unknown: t("Session unavailable", "时段未标注"),
+                    } as Record<string, string>
+                  )[selected.session]
+                }
+              </span>
+            )}
             {selected &&
               (["open", "high", "low", "close"] as const).map((key, i) => (
                 <span key={key}>
@@ -227,6 +271,18 @@ export function PriceChart({
               );
             }}
           >
+            {visible.map((c, i) =>
+              c.session === "pre" || c.session === "post" ? (
+                <rect
+                  key={`session-${c.time}`}
+                  x={x(i) - 410 / visible.length}
+                  y="28"
+                  width={820 / visible.length + 0.5}
+                  height="298"
+                  className={`session-band ${c.session}`}
+                />
+              ) : null,
+            )}
             {[0, 0.25, 0.5, 0.75, 1].map((fraction, i) => (
               <g key={i}>
                 <line

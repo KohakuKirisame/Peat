@@ -38,6 +38,7 @@ jobs:
           done
           curl -fsS http://127.0.0.1:8787/api/auth/setup
           docker exec peat-ci node /opt/peat-runtime/node_modules/@openai/codex/bin/codex.js --version
+          docker exec peat-ci python -c "from peat.market_mcp import server; print(server.name)"
       - name: Cleanup
         if: always()
         run: docker rm -f peat-ci || true

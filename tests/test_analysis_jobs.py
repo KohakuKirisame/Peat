@@ -18,7 +18,9 @@ async def register(client, name="background-owner"):
     )
     response.raise_for_status()
     user = response.json()
-    response = await client.put("/api/settings", json=user["settings"] | {"ai_model": "fixture-max"})
+    response = await client.put(
+        "/api/settings", json=user["settings"] | {"ai_model": "fixture-max", "ai_live_data": False}
+    )
     response.raise_for_status()
     return user["id"]
 

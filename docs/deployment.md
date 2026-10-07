@@ -60,9 +60,13 @@ The image includes Codex `0.155.1` by default; the build argument `CODEX_VERSION
 
 默认镜像包含 Codex `0.155.1`，可通过构建参数 `CODEX_VERSION` 选择版本。管理员在“设置 → 开始设备登录”完成一次授权后，所有 Peat 用户均可选择 Codex 模型进行研究；登录和退出仅限管理员。设备授权由账户所有者在官方页面完成。
 
-`CODEX_HOME` points to the directory recorded in `data/codex-shared.json`. On first use after upgrade, Peat adopts an existing active administrator's login under `users/<id>/codex` without copying tokens. New device logins use `shared/codex`. Keep both the marker and its selected directory when backing up. Signing out does not fall back to another stored account. Credentials are never returned to the browser. `HOME`, temporary files and research workspaces remain per user; inference is ephemeral, ignores user configuration and disables tools. Research enters through stdin with no inherited host API keys or trading credentials.
+`CODEX_HOME` points to the directory recorded in `data/codex-shared.json`. On first use after upgrade, Peat adopts an existing active administrator's login under `users/<id>/codex` without copying tokens. New device logins use `shared/codex`. Keep both the marker and its selected directory when backing up. Signing out does not fall back to another stored account. Credentials are never returned to the browser. `HOME`, temporary files and research workspaces remain per user; inference is ephemeral and ignores host configuration. Live web search and the bundled public research MCP tools can be enabled from Intelligence. Shell, local-file and host plugin access remain disabled. Research enters through stdin with no inherited host API keys or trading credentials.
 
-`CODEX_HOME` 指向 `data/codex-shared.json` 记录的目录。升级后首次使用会沿用活跃管理员在 `users/<id>/codex` 中的登录状态，不复制令牌；新的设备登录使用 `shared/codex`。备份需保留该标记及其指向的目录。退出后不会自动切换到另一历史账户。凭据不返回浏览器；`HOME`、临时文件和研究工作目录仍按用户独立。研究使用临时会话、忽略用户配置并禁用工具；上下文从 stdin 传入，不继承宿主 API Key 或传入交易凭据。
+`CODEX_HOME` 指向 `data/codex-shared.json` 记录的目录。升级后首次使用会沿用活跃管理员在 `users/<id>/codex` 中的登录状态，不复制令牌；新的设备登录使用 `shared/codex`。备份需保留该标记及其指向的目录。退出后不会自动切换到另一历史账户。凭据不返回浏览器；`HOME`、临时文件和研究工作目录仍按用户独立。研究使用临时会话并忽略宿主配置，可在智能研究中启用联网检索和内置公开研究 MCP 工具；Shell、本地文件和宿主插件访问仍关闭。上下文从 stdin 传入，不继承宿主 API Key 或传入交易凭据。
+
+The image includes the Python MCP SDK and `peat/market_mcp.py`; no extra MCP setup or API account is needed. Source deployments should reinstall the hash-locked requirements after upgrading. Public tools use Yahoo Finance, Google News RSS and validated public article URLs. Live search follows the Codex account/model's availability and managed policies; see [OpenAI's search documentation](https://learn.chatgpt.com/docs/web-search).
+
+镜像已包含 Python MCP SDK 与 `peat/market_mcp.py`，无需另行配置 MCP 或注册 API。源码部署升级后需重新安装带哈希的依赖。公开研究工具使用 Yahoo Finance、Google News RSS 及经过校验的公开文章地址。Codex 联网能力随账户、模型及部署策略生效，参见[官方检索文档](https://learn.chatgpt.com/docs/web-search)。
 
 ## Background research / 后台研究
 

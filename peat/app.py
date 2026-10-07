@@ -29,6 +29,7 @@ from .db import Database, now
 from .markets import Markets, exchange_status
 from .news import NewsService
 from .prompts import defaults
+from .research import ResearchContext
 from .runtime import Runtime
 from .security import Vault, digest, hasher, new_session, validate_llm_url, verify_password
 
@@ -50,6 +51,10 @@ class Settings(Body):
         "balanced"
     )
     holding_horizon: Literal["ultra_short", "short", "medium_long"] = "medium_long"
+    analysis_limit: int = Field(default=0, ge=0, le=1000)
+    ai_live_data: bool = True
+    ai_web_search: bool = True
+    ai_market_tools: bool = True
     news_limit: int = Field(default=500, ge=10, le=20000)
     news_days: int = Field(default=30, ge=1, le=365)
     news_interval: int = Field(default=900, ge=300, le=86400)
@@ -105,6 +110,9 @@ class Mapping(Body):
 class Followup(Body):
     question: str = Field(min_length=1, max_length=8000)
     request_id: str = Field(min_length=8, max_length=80, pattern=r"^[A-Za-z0-9_-]+$")
+    refresh_context: bool | None = None
+    web_search: bool | None = None
+    market_tools: bool | None = None
     provider: Literal["openai", "codex"] | None = None
     model: str | None = Field(default=None, max_length=120, pattern=r"^[A-Za-z0-9_./:@-]*$")
     reasoning_effort: (
@@ -121,7 +129,8 @@ def create_app(config: Config | None = None):
     )
     brokers, news, markets = BrokerService(db, vault, client), NewsService(db, client), Markets(db, client)
     runtime, charts = Runtime(config, db), Charts(db, client)
-    ai = Intelligence(db, vault, client, runtime, config, news=news)
+    research = ResearchContext(db, brokers, news, markets, charts)
+    ai = Intelligence(db, vault, client, runtime, config, news=news, live=research)
     analysis_jobs = AnalysisJobs(db, ai)
     attempts = defaultdict(deque)
 
@@ -172,6 +181,7 @@ def create_app(config: Config | None = None):
     app.state.db, app.state.vault, app.state.brokers = db, vault, brokers
     app.state.client, app.state.ai, app.state.runtime, app.state.news = client, ai, runtime, news
     app.state.analysis_jobs = analysis_jobs
+    app.state.research, app.state.charts = research, charts
     app.add_middleware(
         CORSMiddleware,
         allow_origins=config.origins,
@@ -318,12 +328,14 @@ def create_app(config: Config | None = None):
 
     @app.put("/api/settings")
     def settings(body: Settings, user=Depends(current_user)):
+        body = Settings(**(db.settings(user["id"]) | body.model_dump(exclude_unset=True)))
         if any(
             len(value) > 8000
             for value in (*body.ai_style_prompts.values(), *body.ai_horizon_prompts.values())
         ):
             raise HTTPException(422, "prompt_too_long")
         db.execute("UPDATE users SET settings=? WHERE id=?", (body.model_dump_json(), user["id"]))
+        analysis_jobs.reports.prune(user["id"], limit=body.analysis_limit)
         news.prune(user["id"])
         return body
 
@@ -518,6 +530,7 @@ def create_app(config: Config | None = None):
         symbol: str = Query(max_length=60),
         interval: str = "1d",
         period: str = "3mo",
+        extended: bool = False,
         user=Depends(current_user),
     ):
         if "_" in symbol:
@@ -543,7 +556,7 @@ def create_app(config: Config | None = None):
             if not symbol:
                 raise ProviderError("chart_symbol_required")
         symbol = symbol.strip().upper()
-        return await charts.fetch(symbol, interval, period)
+        return await charts.fetch(symbol, interval, period, extended=extended)
 
     @app.put("/api/charts/mapping")
     def set_mapping(body: Mapping, user=Depends(current_user)):
@@ -562,13 +575,26 @@ def create_app(config: Config | None = None):
         return defaults(db.settings(user["id"])["language"])
 
     @app.get("/api/ai/analyses")
-    def analyses(user=Depends(current_user)):
-        rows = db.all("SELECT * FROM analyses WHERE user_id=? ORDER BY id DESC LIMIT 20", (user["id"],))
+    def analyses(before: int | None = Query(None, ge=1), summary: bool = False, user=Depends(current_user)):
+        if summary:
+            return db.all(
+                "SELECT id,provider,model,style,created_at,updated_at,json_extract(evidence,'$.reasoning_effort') AS reasoning_effort,"
+                "json_extract(evidence,'$.holding_horizon') AS holding_horizon FROM analyses WHERE user_id=? AND (? IS NULL OR id<?) ORDER BY id DESC LIMIT 20",
+                (user["id"], before, before),
+            )
+        rows = db.all(
+            "SELECT * FROM analyses WHERE user_id=? AND (? IS NULL OR id<?) ORDER BY id DESC LIMIT 20",
+            (user["id"], before, before),
+        )
         for row in rows:
             row["evidence"] = json.loads(row["evidence"])
             row["reasoning_effort"] = row["evidence"].get("reasoning_effort", "auto")
             row["holding_horizon"] = row["evidence"].get("holding_horizon")
         return rows
+
+    @app.get("/api/ai/storage")
+    def analysis_storage(user=Depends(current_user)):
+        return analysis_jobs.reports.storage(user["id"])
 
     @app.post("/api/ai/analyze", status_code=202)
     async def analyze(user=Depends(current_user)):
@@ -578,9 +604,18 @@ def create_app(config: Config | None = None):
     def analysis(analysis_id: int, user=Depends(current_user)):
         return analysis_jobs.followups.report(user["id"], analysis_id)
 
+    @app.delete("/api/ai/analyses/{analysis_id}")
+    def delete_analysis(analysis_id: int, user=Depends(current_user)):
+        analysis_jobs.reports.delete(user["id"], analysis_id)
+        return {"ok": True}
+
     @app.get("/api/ai/analyses/{analysis_id}/followups")
     def followups(analysis_id: int, before: int | None = Query(None, ge=1), user=Depends(current_user)):
         return analysis_jobs.followups.history(user["id"], analysis_id, before)
+
+    @app.get("/api/ai/analyses/{analysis_id}/followups/{turn_id}/evidence")
+    def followup_evidence(analysis_id: int, turn_id: int, user=Depends(current_user)):
+        return analysis_jobs.followups.evidence(user["id"], analysis_id, turn_id)
 
     @app.post("/api/ai/analyses/{analysis_id}/followups", status_code=202)
     async def ask_followup(analysis_id: int, body: Followup, user=Depends(current_user)):

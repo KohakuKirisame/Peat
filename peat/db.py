@@ -15,6 +15,10 @@ DEFAULT_SETTINGS = {
     "language": "en",
     "style": "balanced",
     "holding_horizon": "medium_long",
+    "analysis_limit": 0,
+    "ai_live_data": True,
+    "ai_web_search": True,
+    "ai_market_tools": True,
     "news_limit": 500,
     "news_days": 30,
     "news_interval": 900,
@@ -69,12 +73,13 @@ CREATE INDEX IF NOT EXISTS news_user_date ON news(user_id,published_at DESC);
 CREATE TABLE IF NOT EXISTS news_bodies (
  news_id INTEGER PRIMARY KEY REFERENCES news(id) ON DELETE CASCADE,
  content TEXT NOT NULL DEFAULT '', source_url TEXT NOT NULL, fetched_at TEXT NOT NULL,
- status TEXT NOT NULL, error TEXT, truncated INTEGER NOT NULL DEFAULT 0
+ status TEXT NOT NULL, error TEXT, truncated INTEGER NOT NULL DEFAULT 0,
+ published_at TEXT, modified_at TEXT
 );
 CREATE TABLE IF NOT EXISTS analyses (
  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  provider TEXT NOT NULL, model TEXT NOT NULL, style TEXT NOT NULL, content TEXT NOT NULL,
- evidence TEXT NOT NULL, created_at TEXT NOT NULL
+ evidence TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT
 );
 CREATE TABLE IF NOT EXISTS analysis_jobs (
  id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -93,6 +98,7 @@ CREATE TABLE IF NOT EXISTS analysis_followups (
  created_at TEXT NOT NULL, answered_at TEXT, UNIQUE(analysis_id,request_key)
 );
 CREATE INDEX IF NOT EXISTS followups_analysis ON analysis_followups(analysis_id,id);
+CREATE TABLE IF NOT EXISTS counters (name TEXT PRIMARY KEY,value INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS statement_rows (
  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  fingerprint TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(user_id,fingerprint)
@@ -114,7 +120,23 @@ class Database:
             columns = {row["name"] for row in conn.execute("PRAGMA table_info(analysis_jobs)")}
             if "kind" not in columns:
                 conn.execute("ALTER TABLE analysis_jobs ADD COLUMN kind TEXT NOT NULL DEFAULT 'analysis'")
-            conn.execute("PRAGMA user_version=4")
+            for table, additions in {
+                "news_bodies": {"published_at": "TEXT", "modified_at": "TEXT"},
+                "analyses": {"updated_at": "TEXT"},
+            }.items():
+                existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+                for column, definition in additions.items():
+                    if column not in existing:
+                        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+            conn.execute(
+                "UPDATE analyses SET updated_at=MAX(created_at,COALESCE((SELECT MAX(COALESCE(f.answered_at,f.created_at)) "
+                "FROM analysis_followups f WHERE f.analysis_id=analyses.id),created_at)) WHERE updated_at IS NULL"
+            )
+            conn.execute(
+                "INSERT INTO counters(name,value) VALUES('analyses',COALESCE((SELECT MAX(id) FROM analyses),0)) "
+                "ON CONFLICT(name) DO UPDATE SET value=MAX(value,excluded.value)"
+            )
+            conn.execute("PRAGMA user_version=5")
 
     @contextmanager
     def connect(self):

@@ -113,7 +113,7 @@ def test_ai_evidence_includes_relevant_article_text_and_selection_reasons(db):
     add_news(db, 1, "Local football fixtures", "sports")
     body = "Full article evidence about Apple earnings and company demand. " * 30
     db.execute(
-        "INSERT INTO news_bodies VALUES(?,?,?,?,?,?,?)",
+        "INSERT INTO news_bodies(news_id,content,source_url,fetched_at,status,error,truncated) VALUES(?,?,?,?,?,?,?)",
         (article, body, "https://publisher.example/apple", now(), "ready", None, 0),
     )
     ai = Intelligence(db, None, None, None, Config(background=False))
@@ -155,7 +155,7 @@ def test_article_schema_upgrade_keeps_existing_news(db):
     db.execute("PRAGMA user_version=1")
     upgraded = Database(db.path)
     assert upgraded.one("SELECT id FROM news WHERE id=?", (article,))
-    assert upgraded.one("PRAGMA user_version")["user_version"] == 4
+    assert upgraded.one("PRAGMA user_version")["user_version"] == 5
 
 
 @pytest.mark.asyncio

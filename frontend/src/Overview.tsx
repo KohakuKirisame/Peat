@@ -200,7 +200,7 @@ export function Overview({
   const { t, user } = useApp(),
     r = useResource("/portfolio", user.settings.portfolio_interval * 1000),
     news = useResource("/news"),
-    analyses = useResource("/ai/analyses");
+    analyses = useResource("/ai/analyses?summary=true");
   const action = useAction();
   const [selected, setSelected] = useState<any>(null);
   const [filter, setFilter] = useState("");

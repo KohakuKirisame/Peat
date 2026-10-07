@@ -5,6 +5,8 @@ import type { Settings } from "./api";
 import { useAnalysisTask } from "./AnalysisTasks";
 import { Markdown } from "./Markdown";
 import { ModelControls } from "./ModelControls";
+import { ResearchControls } from "./ResearchControls";
+import { DataStamp, ResearchSources } from "./ResearchSources";
 import { Button, Loading, Panel, ResourceError, Tag } from "./ui";
 
 type Turn = {
@@ -21,8 +23,55 @@ type Turn = {
   answered_at: string | null;
   included_turns: number;
   omitted_turns: number;
+  context_mode?: string;
+  freshness?: any;
 };
 type Page = { items: Turn[]; next_before: number | null };
+
+function ReplyEvidence({
+  analysisId,
+  turnId,
+}: {
+  analysisId: number;
+  turnId: number;
+}) {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  const resource = useResource(
+    open ? `/ai/analyses/${analysisId}/followups/${turnId}/evidence` : null,
+    0,
+    false,
+  );
+  return (
+    <details
+      className="reply-evidence"
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary>{t("Sources & data times", "资料与时间依据")}</summary>
+      {open &&
+        (resource.loading ? (
+          <Loading />
+        ) : resource.error ? (
+          <ResourceError error={resource.error} retry={resource.reload} />
+        ) : (
+          <>
+            {!resource.data?.evidence && (
+              <p className="field-hint">
+                {t(
+                  "Reviewed using the original report's evidence.",
+                  "使用原报告当时的依据复盘。",
+                )}
+              </p>
+            )}
+            <ResearchSources
+              evidence={resource.data?.evidence}
+              activity={resource.data?.research_activity}
+            />
+          </>
+        ))}
+    </details>
+  );
+}
 
 const requestId = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
@@ -95,6 +144,9 @@ export function FollowupChat({ analysis }: { analysis: any }) {
       provider: models.ai_provider,
       model: models.ai_model,
       reasoning_effort: models.reasoning_effort,
+      refresh_context: models.ai_live_data !== false,
+      web_search: models.ai_web_search !== false,
+      market_tools: models.ai_market_tools !== false,
     };
     const signature = JSON.stringify(body);
     if (pending.current?.signature !== signature)
@@ -108,8 +160,8 @@ export function FollowupChat({ analysis }: { analysis: any }) {
     <Panel
       title={t("Discuss this brief", "追问这份简报")}
       sub={t(
-        "Continue with this report and its saved evidence.",
-        "结合这份报告及其保存的证据继续讨论。",
+        "Discuss the report, current prices and next steps.",
+        "继续讨论报告、当前行情与下一步操作。",
       )}
       className="followup-panel"
       action={<MessageCircle size={19} />}
@@ -166,6 +218,8 @@ export function FollowupChat({ analysis }: { analysis: any }) {
                 {turn.answer && turn.status === "completed" ? (
                   <>
                     <Markdown content={turn.answer} />
+                    <DataStamp evidence={{ freshness: turn.freshness }} />
+                    <ReplyEvidence analysisId={analysis.id} turnId={turn.id} />
                     {turn.omitted_turns > 0 && (
                       <p className="field-hint">
                         {t(
@@ -248,6 +302,7 @@ export function FollowupChat({ analysis }: { analysis: any }) {
           </summary>
           <ModelControls settings={models} onChange={setModels} />
         </details>
+        <ResearchControls settings={models} onChange={setModels} followup />
         <form
           onSubmit={(event) => {
             event.preventDefault();

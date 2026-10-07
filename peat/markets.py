@@ -173,16 +173,12 @@ class Markets:
                 for term in (2, 10, 30)
             ]
 
-    async def refresh(self):
+    async def refresh(self, *, force=False):
         async with self.lock:
             cached = self.db.cached(0, "markets")
-            if (
-                cached
-                and (
-                    datetime.now(timezone.utc) - datetime.fromisoformat(cached["updated_at"])
-                ).total_seconds()
-                < 300
-            ):
+            if cached and (
+                datetime.now(timezone.utc) - datetime.fromisoformat(cached["updated_at"])
+            ).total_seconds() < (15 if force else 300):
                 return cached
             results = await asyncio.gather(self.treasury(), *(self.commodity(*item) for item in COMMODITIES))
             quotes = results[0] + list(results[1:])

@@ -3428,6 +3428,61 @@ html[data-theme="dark"] .peat-topography {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.chart-sessions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 4px 0 12px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.chart-sessions .checkbox {
+  font-size: 10px;
+  gap: 7px;
+  flex-direction: row;
+  align-items: center;
+}
+.session-band.pre { fill: var(--accent); opacity: .085; }
+.session-band.post { fill: var(--amber); opacity: .085; }
+.session-label.pre { color: var(--accent-ink); }
+.session-label.post { color: var(--amber); }
+.session-legend { display: inline-flex; align-items: center; gap: 6px; }
+.session-legend i { width: 7px; height: 7px; border-radius: 2px; }
+.session-legend .pre { background: var(--accent); }
+.session-legend .post { background: var(--amber); }
+.research-controls {
+  padding: 16px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.research-controls .checkbox { flex-direction: row; align-items: flex-start; font-size: 11px; line-height: 1.6; }
+.research-controls input { flex-shrink: 0; margin-top: 2px; }
+.followup-composer .research-controls { padding: 0 0 17px; }
+.research-datastamp {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 13px;
+  color: var(--muted);
+  font-size: 10px;
+  margin: 0 0 17px;
+  line-height: 1.7;
+}
+.followup-answer .research-datastamp { margin: 12px 0; }
+.research-sources { font-size: 11px; line-height: 1.8; }
+.research-sources .news-timing { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.research-sources .source-line { padding-inline: 0; overflow-wrap: anywhere; }
+.research-sources .external { display: inline; overflow-wrap: anywhere; }
+.reply-evidence { margin-top: 12px; }
+.reply-evidence summary { font-size: 11px; color: var(--accent-ink); cursor: pointer; }
+.brief-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.archive-more { padding: 15px 20px; }
+@media (max-width: 760px) {
+  .research-controls { padding-inline: 15px; }
+  .brief-actions .button { padding: 9px 10px; font-size: 10px; }
+}
 .followup-state {
   display: flex;
   align-items: center;

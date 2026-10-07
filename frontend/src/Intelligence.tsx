@@ -3,6 +3,8 @@ import { Markdown } from "./Markdown";
 import { useAnalysisTask } from "./AnalysisTasks";
 import { FollowupChat } from "./FollowupChat";
 import { ModelControls } from "./ModelControls";
+import { ResearchControls } from "./ResearchControls";
+import { DataStamp, ResearchSources } from "./ResearchSources";
 import {
   ArrowUpRight,
   BookOpenText,
@@ -14,10 +16,13 @@ import {
   SlidersHorizontal,
   Sparkles,
   Sprout,
+  Trash2,
 } from "lucide-react";
 import type { Settings } from "./api";
 import {
   date,
+  api,
+  del,
   styles,
   holdingHorizons,
   horizonLabel,
@@ -38,7 +43,7 @@ import {
 export default function Intelligence() {
   const analysisTask = useAnalysisTask();
   const { t, user, saveSettings, notify } = useApp(),
-    r = useResource<any[]>("/ai/analyses"),
+    r = useResource<any[]>("/ai/analyses?summary=true"),
     defaults = useResource("/ai/prompts");
   const [settings, setSettings] = useState(user.settings),
     [promptOpen, setPromptOpen] = useState(false),
@@ -48,16 +53,28 @@ export default function Intelligence() {
     ),
     [current, setCurrent] = useState<number | null>(null),
     [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [olderReports, setOlderReports] = useState<any[]>([]);
+  const [moreReports, setMoreReports] = useState(true);
+  const olderAction = useAction(),
+    deleteAction = useAction();
   const action = useAction(),
     save = useAction();
   useEffect(() => setSettings(user.settings), [user.settings]);
-  const listed = r.data?.find((a) => a.id === current);
+  const reports = Array.from(
+    new Map(
+      [...(r.data || []), ...olderReports].map((a) => [a.id, a]),
+    ).values(),
+  ).sort((a, b) => b.id - a.id);
+  const selectedId = current || reports[0]?.id;
+  const listed = reports.find((a) => a.id === selectedId);
   const focused = useResource(
-    current && !listed ? `/ai/analyses/${current}` : null,
+    selectedId && listed?.content === undefined
+      ? `/ai/analyses/${selectedId}`
+      : null,
     0,
     false,
   );
-  const analysis = current ? listed || focused.data : r.data?.[0];
+  const analysis = listed?.content !== undefined ? listed : focused.data;
   useEffect(() => {
     if (analysisTask.viewRequest)
       setCurrent(analysisTask.viewRequest.analysisId);
@@ -70,6 +87,8 @@ export default function Intelligence() {
       if (analysisTask.job.kind !== "followup")
         setCurrent(analysisTask.job.analysis_id);
       r.reload();
+      setOlderReports([]);
+      setMoreReports(true);
     }
   }, [analysisTask.job?.id, analysisTask.job?.status]);
   const selectedStyle = styles.find((s) => s[0] === settings.style);
@@ -161,6 +180,7 @@ export default function Intelligence() {
               </div>
             </div>
             <ModelControls settings={settings} onChange={setSettings} />
+            <ResearchControls settings={settings} onChange={setSettings} />
             <div className="settings-actions">
               <button
                 className="text-button"
@@ -335,25 +355,63 @@ export default function Intelligence() {
           <Panel
             title={t("Your research brief", "你的研究简报")}
             sub={t(
-              "A synthesis of your portfolio, macro signals and saved news.",
-              "基于当前持仓、宏观数据及本地新闻综合生成。",
+              "Time-aware research using holdings, market data and current sources.",
+              "结合持仓、行情与最新资料，并核对事件发生时间。",
             )}
             action={
-              <Button
-                busy={action.busy || analysisTask.starting}
-                disabled={analysisTask.active}
-                onClick={() =>
-                  action.run(async () => {
-                    await saveSettings(settings);
-                    await analysisTask.start();
-                  })
-                }
-              >
-                <Sparkles size={16} />
-                {analysisTask.active
-                  ? t("Running in background", "后台生成中")
-                  : t("Generate brief", "生成简报")}
-              </Button>
+              <div className="brief-actions">
+                {analysis && (
+                  <Button
+                    secondary
+                    busy={deleteAction.busy}
+                    disabled={
+                      analysisTask.active &&
+                      analysisTask.job?.analysis_id === analysis.id
+                    }
+                    onClick={() =>
+                      deleteAction.run(async () => {
+                        if (
+                          !window.confirm(
+                            t(
+                              "Delete this report and all its follow-up questions?",
+                              "删除这份报告及其全部追问记录？",
+                            ),
+                          )
+                        )
+                          return;
+                        const id = analysis.id;
+                        await del(`/ai/analyses/${id}`);
+                        analysisTask.discardReport(id);
+                        r.setData((r.data || []).filter((a) => a.id !== id));
+                        setOlderReports([]);
+                        setMoreReports(true);
+                        setCurrent(null);
+                        setEvidenceOpen(false);
+                        r.reload();
+                        notify(t("Report deleted", "报告已删除"));
+                      })
+                    }
+                  >
+                    <Trash2 size={14} />
+                    {t("Delete report", "删除报告")}
+                  </Button>
+                )}
+                <Button
+                  busy={action.busy || analysisTask.starting}
+                  disabled={analysisTask.active}
+                  onClick={() =>
+                    action.run(async () => {
+                      await saveSettings(settings);
+                      await analysisTask.start();
+                    })
+                  }
+                >
+                  <Sparkles size={16} />
+                  {analysisTask.active
+                    ? t("Running in background", "后台生成中")
+                    : t("Generate brief", "生成简报")}
+                </Button>
+              </div>
             }
           >
             {analysisTask.active && analysisTask.job?.kind !== "followup" && (
@@ -393,6 +451,7 @@ export default function Intelligence() {
                   </span>
                 </div>
                 <div className="brief-content">
+                  <DataStamp evidence={analysis.evidence} />
                   <Markdown content={analysis.content} />
                 </div>
                 <button
@@ -405,6 +464,7 @@ export default function Intelligence() {
                 </button>
                 {evidenceOpen && (
                   <div className="evidence">
+                    <ResearchSources evidence={analysis.evidence} />
                     <p>
                       {t("Portfolio snapshot", "持仓快照")} ·{" "}
                       {date(
@@ -427,28 +487,29 @@ export default function Intelligence() {
                         {analysis.evidence.news_selection.candidate_count}
                       </p>
                     )}
-                    {analysis.evidence?.news?.map((n: any) => (
-                      <p key={n.id}>
-                        <span>[news {n.id}] </span>
-                        <External href={n.url}>{n.title}</External>
-                        {n.related_entities?.length > 0 && (
-                          <small className="evidence-related">
-                            {t("Related to", "关联")} ·{" "}
-                            {Array.from(
-                              new Set(
-                                n.related_entities.map(
-                                  (entity: any) => entity.name,
+                    {!analysis.evidence?.freshness &&
+                      analysis.evidence?.news?.map((n: any) => (
+                        <p key={n.id}>
+                          <span>[news {n.id}] </span>
+                          <External href={n.url}>{n.title}</External>
+                          {n.related_entities?.length > 0 && (
+                            <small className="evidence-related">
+                              {t("Related to", "关联")} ·{" "}
+                              {Array.from(
+                                new Set(
+                                  n.related_entities.map(
+                                    (entity: any) => entity.name,
+                                  ),
                                 ),
-                              ),
-                            ).join(" · ")}
-                            {" · "}
-                            {n.content_kind === "rss_excerpt"
-                              ? t("RSS excerpt", "RSS 摘要")
-                              : t("Article text", "新闻正文")}
-                          </small>
-                        )}
-                      </p>
-                    ))}
+                              ).join(" · ")}
+                              {" · "}
+                              {n.content_kind === "rss_excerpt"
+                                ? t("RSS excerpt", "RSS 摘要")
+                                : t("Article text", "新闻正文")}
+                            </small>
+                          )}
+                        </p>
+                      ))}
                     <details>
                       <summary>
                         {t(
@@ -457,17 +518,20 @@ export default function Intelligence() {
                         )}
                       </summary>
                       <pre>
-                        {analysis.evidence?.prompts?.base}
-                        {"\n\n"}
-                        {analysis.evidence?.prompts?.style}
-                        {"\n\n"}
-                        {analysis.evidence?.prompts?.horizon}
+                        {analysis.evidence?.system_prompt ||
+                          [
+                            analysis.evidence?.prompts?.base,
+                            analysis.evidence?.prompts?.style,
+                            analysis.evidence?.prompts?.horizon,
+                          ]
+                            .filter(Boolean)
+                            .join("\n\n")}
                       </pre>
                     </details>
                   </div>
                 )}
               </>
-            ) : current && focused.loading ? (
+            ) : selectedId && focused.loading ? (
               <Loading />
             ) : (
               <Empty
@@ -527,8 +591,8 @@ export default function Intelligence() {
           </div>
           <Panel title={t("Research archive", "研究档案")}>
             <div className="archive-list">
-              {r.data?.length ? (
-                r.data.map((a) => (
+              {reports.length ? (
+                reports.map((a) => (
                   <button
                     key={a.id}
                     onClick={() => {
@@ -549,6 +613,12 @@ export default function Intelligence() {
                       <small>
                         {date(a.created_at, user.settings.language)}
                       </small>
+                      {a.updated_at && a.updated_at !== a.created_at && (
+                        <small>
+                          {t("Last activity", "最近活动")} ·{" "}
+                          {date(a.updated_at, user.settings.language)}
+                        </small>
+                      )}
                       {a.holding_horizon && (
                         <small>{horizonLabel(a.holding_horizon, t)}</small>
                       )}
@@ -566,6 +636,25 @@ export default function Intelligence() {
                 </p>
               )}
             </div>
+            {(r.data?.length || 0) >= 20 && moreReports && (
+              <div className="archive-more">
+                <Button
+                  secondary
+                  busy={olderAction.busy}
+                  onClick={() =>
+                    olderAction.run(async () => {
+                      const next = await api<any[]>(
+                        `/ai/analyses?summary=true&before=${reports.at(-1)?.id}`,
+                      );
+                      setOlderReports((current) => [...current, ...next]);
+                      setMoreReports(next.length === 20);
+                    })
+                  }
+                >
+                  {t("Load older reports", "读取更早报告")}
+                </Button>
+              </div>
+            )}
           </Panel>
         </aside>
       </div>

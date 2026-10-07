@@ -105,10 +105,11 @@ class NewsService:
                     result["source_url"] = exc.source_url
             # A retention cleanup may have removed/replaced this ID during the request.
             self.db.execute(
-                "INSERT INTO news_bodies(news_id,content,source_url,fetched_at,status,error,truncated) "
-                "SELECT id,?,?,?,?,?,? FROM news WHERE id=? AND user_id=? AND fingerprint=? "
+                "INSERT INTO news_bodies(news_id,content,source_url,fetched_at,status,error,truncated,published_at,modified_at) "
+                "SELECT id,?,?,?,?,?,?,?,? FROM news WHERE id=? AND user_id=? AND fingerprint=? "
                 "ON CONFLICT(news_id) DO UPDATE SET content=excluded.content,source_url=excluded.source_url,"
-                "fetched_at=excluded.fetched_at,status=excluded.status,error=excluded.error,truncated=excluded.truncated",
+                "fetched_at=excluded.fetched_at,status=excluded.status,error=excluded.error,truncated=excluded.truncated,"
+                "published_at=excluded.published_at,modified_at=excluded.modified_at",
                 (
                     result["content"],
                     result["source_url"],
@@ -116,6 +117,8 @@ class NewsService:
                     result["status"],
                     result["error"],
                     result["truncated"],
+                    result.get("published_at"),
+                    result.get("modified_at"),
                     article_id,
                     uid,
                     article["fingerprint"],

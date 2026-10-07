@@ -38,6 +38,7 @@ const Tasks = createContext<{
   cancel: () => Promise<void>;
   dismiss: () => void;
   viewReport: () => void;
+  discardReport: (id: number) => void;
   viewRequest: { analysisId: number; serial: number } | null;
 }>({} as never);
 export const useAnalysisTask = () => useContext(Tasks);
@@ -125,6 +126,7 @@ export function AnalysisTasks({ children }: { children: ReactNode }) {
       if (alive.current) {
         accept(next);
         setDismissed(null);
+        setViewRequest(null);
         wake.current();
       }
       return next;
@@ -166,6 +168,15 @@ export function AnalysisTasks({ children }: { children: ReactNode }) {
         cancel,
         dismiss,
         viewRequest,
+        discardReport: (id) => {
+          setViewRequest((current) =>
+            current?.analysisId === id ? null : current,
+          );
+          if (latest.current?.analysis_id === id) {
+            revision.current++;
+            accept({ ...latest.current, status: "deleted", analysis_id: null });
+          }
+        },
         viewReport: () => {
           if (job?.analysis_id)
             setViewRequest((previous) => ({
@@ -193,7 +204,12 @@ export function AnalysisTaskBanner({
     const timer = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [task.active]);
-  if (!task.job || (!task.active && task.hidden)) return null;
+  if (
+    !task.job ||
+    task.job.status === "deleted" ||
+    (!task.active && task.hidden)
+  )
+    return null;
   const job = task.job,
     seconds = Math.max(
       0,
@@ -210,6 +226,15 @@ export function AnalysisTaskBanner({
   const phases: Record<string, string> = {
     queued: t("Queued", "等待开始"),
     preparing: t("Preparing research", "准备研究数据"),
+    refreshing: t(
+      "Refreshing portfolio, news and markets",
+      "刷新持仓、新闻与行情",
+    ),
+    price_context: t(
+      "Matching news to price history",
+      "对齐新闻时间与价格走势",
+    ),
+    researching: t("Checking market data and sources", "核验行情与资料"),
     fetching_news: t("Reading relevant news", "读取相关新闻"),
     generating: t("Generating brief", "正在生成简报"),
     replying: t("Replying to your question", "正在回复追问"),

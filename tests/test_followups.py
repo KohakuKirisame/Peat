@@ -16,6 +16,7 @@ async def owner(client, app, username="followup-owner", provider="openai"):
         )
     ).json()
     uid = user["id"]
+    await client.put("/api/settings", json=user["settings"] | {"ai_live_data": False})
     evidence = {
         "portfolio": {
             "updated_at": "2026-10-01T12:00:00Z",
@@ -246,7 +247,9 @@ def test_schema_upgrade_preserves_existing_reports_and_jobs(tmp_path):
     db.execute(
         "INSERT INTO users(id,username,password_hash,role,created_at) VALUES(1,'fixture','unused','admin','2026')"
     )
-    db.execute("INSERT INTO analyses VALUES(1,1,'openai','fixture','balanced','KEEP REPORT','{}','2026')")
+    db.execute(
+        "INSERT INTO analyses(id,user_id,provider,model,style,content,evidence,created_at) VALUES(1,1,'openai','fixture','balanced','KEEP REPORT','{}','2026')"
+    )
     db.execute(
         "INSERT INTO analysis_jobs(id,user_id,status,phase,settings,analysis_id,created_at,updated_at) VALUES('old-job',1,'completed','finished','{}',1,'2026','2026')"
     )
@@ -256,7 +259,7 @@ def test_schema_upgrade_preserves_existing_reports_and_jobs(tmp_path):
     migrated = Database(db.path)
     assert migrated.one("SELECT content FROM analyses")["content"] == "KEEP REPORT"
     assert migrated.one("SELECT kind FROM analysis_jobs")["kind"] == "analysis"
-    assert migrated.one("PRAGMA user_version")["user_version"] == 4
+    assert migrated.one("PRAGMA user_version")["user_version"] == 5
     assert migrated.all("PRAGMA foreign_key_check") == []
 
 

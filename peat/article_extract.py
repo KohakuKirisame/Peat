@@ -8,6 +8,8 @@ from urllib.parse import urljoin, urlparse
 import trafilatura
 from lxml import etree, html
 
+from .temporal import timestamp
+
 
 def normalized_url(value):
     parsed = urlparse(value)
@@ -122,6 +124,14 @@ def inspect_page(page: bytes, source: str, expected_title: str | None = None):
             continue
     chosen = max(candidates, key=lambda item: item[0]) if candidates else None
     article = chosen[1] if chosen and chosen[0] >= 0 else {}
+    dates = {}
+    for field, key, meta_key in (
+        ("published_at", "datePublished", "article:published_time"),
+        ("modified_at", "dateModified", "article:modified_time"),
+    ):
+        alternatives_date = tree.xpath(f'//meta[@property="{meta_key}"]/@content')
+        value = article.get(key) or (alternatives_date[0] if alternatives_date else None)
+        dates[field] = value if isinstance(value, str) and len(value) <= 64 and timestamp(value) else None
     if (
         article.get("isAccessibleForFree") is False
         or str(article.get("isAccessibleForFree", "")).lower() == "false"
@@ -170,7 +180,13 @@ def inspect_page(page: bytes, source: str, expected_title: str | None = None):
         content, method = (
             structured if structured and len(structured[0]) >= len(longest[0]) * 0.6 else longest
         )
-        return {"content": content, "method": method, "error": None, "alternatives": alternatives[:2]}
+        return {
+            "content": content,
+            "method": method,
+            "error": None,
+            "alternatives": alternatives[:2],
+            **dates,
+        }
     visible = " ".join(tree.xpath("//body//text()[not(ancestor::script or ancestor::style)]"))
     return {
         "content": None,

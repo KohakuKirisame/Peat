@@ -262,6 +262,8 @@ class ArticleReader:
                 "source_url": source,
                 "truncated": len(text) > MAX_ARTICLE,
                 "extraction_method": extracted.get("method"),
+                "published_at": extracted.get("published_at"),
+                "modified_at": extracted.get("modified_at"),
             }
         except ArticleError as exc:
             if resolving:

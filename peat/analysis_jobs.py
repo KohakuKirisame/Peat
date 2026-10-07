@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from .brokers import ProviderError
 from .db import Database, now
 from .followups import Followups
+from .reports import Reports
 
 ACTIVE = ("queued", "running", "cancelling")
 
@@ -17,6 +18,7 @@ class AnalysisJobs:
     def __init__(self, db: Database, intelligence):
         self.db, self.intelligence = db, intelligence
         self.followups = Followups(db, intelligence)
+        self.reports = Reports(db)
         self.tasks: dict[str, asyncio.Task] = {}
         self.stopping = False
 
@@ -51,6 +53,7 @@ class AnalysisJobs:
             "reasoning_effort": settings["reasoning_effort"],
             "style": settings["style"],
             "holding_horizon": settings.get("holding_horizon"),
+            "live_data": settings.get("ai_live_data", False),
         }
 
     def get(self, uid, job_id):
@@ -80,6 +83,15 @@ class AnalysisJobs:
                 "reasoning_effort": followup.get("reasoning_effort") or report["reasoning_effort"],
                 "style": report["style"],
                 "holding_horizon": report["holding_horizon"],
+                "ai_live_data": followup.get("refresh_context")
+                if followup.get("refresh_context") is not None
+                else settings["ai_live_data"],
+                "ai_web_search": followup.get("web_search")
+                if followup.get("web_search") is not None
+                else settings["ai_web_search"],
+                "ai_market_tools": followup.get("market_tools")
+                if followup.get("market_tools") is not None
+                else settings["ai_market_tools"],
             }
             if not followup["question"].strip():
                 raise HTTPException(422, "question_required")
@@ -98,7 +110,15 @@ class AnalysisJobs:
                 if previous:
                     saved = json.loads(previous["settings"])
                     if previous["question"] != followup["question"].strip() or any(
-                        saved[key] != settings[key] for key in ("ai_provider", "ai_model", "reasoning_effort")
+                        followup.get(field) is not None and saved.get(key) != followup[field]
+                        for field, key in (
+                            ("provider", "ai_provider"),
+                            ("model", "ai_model"),
+                            ("reasoning_effort", "reasoning_effort"),
+                            ("refresh_context", "ai_live_data"),
+                            ("web_search", "ai_web_search"),
+                            ("market_tools", "ai_market_tools"),
+                        )
                     ):
                         raise HTTPException(409, "followup_request_conflict")
                     return self.public(dict(previous))
@@ -121,6 +141,9 @@ class AnalysisJobs:
                     "INSERT INTO analysis_followups(analysis_id,job_id,request_key,question,created_at) VALUES(?,?,?,?,?)",
                     (report_id, job_id, followup["request_id"], followup["question"].strip(), created),
                 ).lastrowid
+                conn.execute(
+                    "UPDATE analyses SET updated_at=? WHERE id=? AND user_id=?", (created, report_id, uid)
+                )
         task = asyncio.create_task(self._work(uid, job_id, settings, turn_id), name=f"peat-analysis-{job_id}")
         self.tasks[job_id] = task
         task.add_done_callback(lambda _: self.tasks.pop(job_id, None))
@@ -143,13 +166,22 @@ class AnalysisJobs:
             with self.db.connect() as conn:
                 if turn_id:
                     conn.execute(
-                        "UPDATE analysis_followups SET answer=?,answered_at=? WHERE id=?",
-                        (result["content"], now(), turn_id),
+                        "UPDATE analysis_followups SET answer=?,answered_at=?,context=COALESCE(?,context) WHERE id=?",
+                        (
+                            result["content"],
+                            now(),
+                            json.dumps(result["context"]) if result.get("context") is not None else None,
+                            turn_id,
+                        ),
                     )
                 conn.execute(
                     "UPDATE analysis_jobs SET status='completed',phase='finished',analysis_id=?,updated_at=?,finished_at=? WHERE id=?",
                     (result["id"], now(), now(), job_id),
                 )
+                conn.execute(
+                    "UPDATE analyses SET updated_at=? WHERE id=? AND user_id=?", (now(), result["id"], uid)
+                )
+                self.reports.prune(uid, conn=conn, protected=(result["id"],))
         except asyncio.CancelledError:
             status = "interrupted" if self.stopping else "cancelled"
             self.db.execute(

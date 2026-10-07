@@ -5,6 +5,7 @@ import re
 from datetime import datetime, timezone
 
 from .db import Database
+from .temporal import news_timing
 
 SECTOR_TERMS = {
     "semiconductors": ("semiconductor", "semiconductors", "chips", "chipmaker", "半导体", "芯片"),
@@ -47,7 +48,7 @@ def aliases(name: str, ticker: str) -> set[str]:
     return {value for value in values if len(value) >= 2}
 
 
-def select_news(db: Database, uid: int, limit: int = 30):
+def select_news(db: Database, uid: int, limit: int = 30, horizon="medium_long"):
     cached_portfolio = db.cached(uid, "portfolio")
     portfolio = (cached_portfolio or {}).get("data", {})
     holdings = portfolio.get("positions", [])
@@ -91,8 +92,9 @@ def select_news(db: Database, uid: int, limit: int = 30):
                 "weight": max(sectors.get(key, {}).get("weight", 0), held["weight"] if held else 0),
             }
     candidates = db.all(
-        "SELECT id,fingerprint,title,substr(content,1,1600) AS content,topic,source,url,published_at,fetched_at "
-        "FROM news WHERE user_id=?",
+        "SELECT n.id,n.fingerprint,n.title,substr(n.content,1,1600) AS content,n.topic,n.source,n.url,n.published_at,n.fetched_at,"
+        "b.published_at AS source_published_at,b.modified_at AS source_modified_at "
+        "FROM news n LEFT JOIN news_bodies b ON b.news_id=n.id WHERE n.user_id=?",
         (uid,),
     )
     ranked = []
@@ -119,16 +121,13 @@ def select_news(db: Database, uid: int, limit: int = 30):
             )
         if not related:
             continue
-        try:
-            stamp = datetime.fromisoformat(
-                (article["published_at"] or article["fetched_at"]).replace("Z", "+00:00")
-            )
-            age = max(
-                0, (current - stamp.replace(tzinfo=stamp.tzinfo or timezone.utc)).total_seconds() / 86400
-            )
-            score += 12 / (1 + age)
-        except (ValueError, TypeError):
-            pass
+        timing = news_timing(article, horizon, current)
+        if timing["timing_class"] == "future_unverified":
+            continue
+        age = timing["age_hours"]
+        decay = {"ultra_short": 24, "short": 168, "medium_long": 720}.get(horizon, 720)
+        score *= 0.25 + 0.75 * math.exp(-max(0, age) / decay) if age is not None else 0.2
+        article.update(timing)
         article.update(relevance_score=round(score, 2), related_entities=related)
         ranked.append(article)
     ranked.sort(
@@ -192,5 +191,8 @@ def select_news(db: Database, uid: int, limit: int = 30):
             "max_articles": limit,
             "holding_symbols": [entity["symbol"] for entity in entities if entity["kind"] == "holding"],
             "industries": [sector["name"] for sector in sectors.values()],
+            "holding_horizon": horizon,
+            "recent_count": sum(a["timing_class"] == "recent" for a in selected),
+            "background_count": sum(a["timing_class"] == "background" for a in selected),
         },
     }

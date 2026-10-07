@@ -320,7 +320,7 @@ class BrokerService:
             except (ProviderError, KeyError, TypeError, AttributeError):
                 return cached["data"].get(ticker) if cached else None
 
-    async def sync(self, uid: int):
+    async def sync(self, uid: int, *, refresh_pies=True):
         async with self.locks.setdefault(uid, asyncio.Lock()):
             cached = self.db.cached(uid, "portfolio")
             if time.monotonic() < self.next_attempt.get((uid, "portfolio"), 0):
@@ -348,7 +348,11 @@ class BrokerService:
                 if pie_cache
                 else float("inf")
             )
-            if pie_age >= 300 and time.monotonic() >= self.next_attempt.get((uid, "pies"), 0):
+            if (
+                refresh_pies
+                and pie_age >= 300
+                and time.monotonic() >= self.next_attempt.get((uid, "pies"), 0)
+            ):
                 self.next_attempt[uid, "pies"] = time.monotonic() + 300
                 try:
                     metadata = await adapter.pies()
